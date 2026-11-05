@@ -109,13 +109,6 @@ label .req{color:var(--red);margin-right:2px}
 .sample-card .sample-code{font-family:ui-monospace,monospace;background:#fff;padding:4px 10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--primary);display:inline-block;margin-bottom:10px}
 .sample-card .rm{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;width:28px;height:28px;border-radius:8px;font-size:16px;padding:0}
 
-.res-row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border)}
-.res-row .name{font-size:13.5px;font-weight:600}
-.res-row .name small{display:block;color:var(--muted);font-weight:500;font-size:11.5px;margin-top:2px}
-.res-row input{padding:10px 12px;text-align:center;font-weight:700;font-size:15px}
-.res-row input.bad{border-color:var(--red);background:var(--red-bg);color:var(--red)}
-.res-row input.good{border-color:var(--green)}
-
 .empty{text-align:center;padding:50px 20px;color:var(--muted)}
 .empty p{margin:0;font-size:14px}
 hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
@@ -142,8 +135,8 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
 <script>
 const DB = {
   get(k, def){ try{ const v = localStorage.getItem('app_'+k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
-  set(k, v){ localStorage.setItem('app_'+k, JSON.stringify(v)); },
-  del(k){ localStorage.removeItem('app_'+k); }
+  set(k, v){ try { localStorage.setItem('app_'+k, JSON.stringify(v)); } catch(e) { console.error('Storage error', e); } },
+  del(k){ try { localStorage.removeItem('app_'+k); } catch(e){} }
 };
 
 const $ = s => document.querySelector(s);
@@ -175,19 +168,16 @@ function seedIfEmpty(){
   DB.set('users', users);
   DB.set('lab_limits', { bod_max: 600, tss_max: 800, cod_max: 1100, og_max: 100, ph_min: 6, ph_max: 9.5 });
   
-  // Seed Facilities
   const facilities = [
     { id:'f1', name:'مصنع النور للغزل والنسيج', owner:'حسن محمد', address:'شارع الجمهورية، بنها', branch_id:'b1', code:'1/1', classification:'industrial', activity:'غزل ونسيج', monthly_water_m3:1200, water_source_type:'gov', gov_account:'88451200', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
     { id:'f2', name:'محطة وقود التعاون', owner:'سامي إبراهيم', address:'ميدان المحطة، بنها', branch_id:'b1', code:'2/1', classification:'commercial', activity:'محطة وقود', monthly_water_m3:300, water_source_type:'gov', gov_account:'88451201', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false }
   ];
   DB.set('facilities', facilities);
   
-  // Seed Inspections & Samples
   DB.set('inspections', [{ id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false }]);
   DB.set('samples', [{ id:'s1', code:'1-260112-X7K2', facility_id:'f1', inspection_id:'i1', type:'simple', outlet:'المخرج الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'pass', deleted:false }]);
   DB.set('results', [{ id:'r1', sample_id:'s1', bod:300, cod:800, tss:400, og:50, ph:7.2, temperature:28, settle_10:1, settle_15:2, entered_by:'u6', entered_at:nowISO(), auto_status:'pass', deleted:false }]);
   
-  // Seed Plans & Licenses
   DB.set('plan_items', [{ id:'p1', date:today(), facility_id:'f1', branch_id:'b1', inspector_id:'u6', status:'scheduled', priority:'high', reason:'متابعة' }]);
   DB.set('licenses', [{ id:'l1', request_no:'LIC-001', date:today(), facility_name:'مصنع الأمل', owner:'أحمد علي', branch_id:'b1', status:'new', docs:{} }]);
   DB.set('license_required_docs', ['سجل تجاري', 'بطاقة ضريبية', 'عقد ملكية']);
@@ -214,18 +204,18 @@ function route(path, render){ routes[path] = render; }
 
 function router(){
   const hash = location.hash || '#/login';
-  const pathString = hash.slice(1); 
+  const pathString = hash.slice(1); // e.g. '/login' or '/inspection/new'
   
-  if(!Session.user && pathString !== 'login'){ location.hash = '#/login'; return; }
-  if(Session.user && pathString === 'login'){ location.hash = '#/home'; return; }
+  if(!Session.user && pathString !== '/login'){ location.hash = '#/login'; return; }
+  if(Session.user && pathString === '/login'){ location.hash = '#/home'; return; }
 
-  // Check exact match first (e.g., /inspection/new)
-  if (routes['/' + pathString]) {
-    routes['/' + pathString]();
+  // 1. Check exact match first (e.g. /inspection/new)
+  if (routes[pathString]) {
+    routes[pathString]();
     return;
   }
 
-  // Check base path with params (e.g., /inspection/123)
+  // 2. Check base path with params (e.g. /inspection/123)
   const parts = pathString.split('/').filter(Boolean);
   const path = '/' + parts[0];
   const fn = routes[path];
