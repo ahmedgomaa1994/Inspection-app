@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d2d5a">
-<title>إدارة الرقابة على الصرف الصناعي</title>
+<title>الرقابة على الصرف الصناعي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -116,15 +116,13 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
 .text-red{color:var(--red)}
 .text-green{color:var(--green)}
 .tiny{font-size:11.5px}
-
-.tabs{display:flex;background:#fff;border-radius:12px;padding:4px;margin-bottom:14px;box-shadow:var(--shadow);overflow-x:auto}
-.tabs button{flex:1;padding:10px;border-radius:8px;background:transparent;color:var(--muted);font-size:13.5px;font-weight:700;white-space:nowrap}
-.tabs button.active{background:var(--primary);color:#fff}
+.pump-row{background:var(--primary-xl);border-radius:12px;padding:12px;margin-bottom:10px;position:relative}
+.pump-row .rm{position:absolute;top:6px;left:6px;background:var(--red);color:#fff;width:28px;height:28px;border-radius:8px;font-size:16px;line-height:1;padding:0}
 
 /* Print Styles */
 @media print {
   body { background: #fff; padding: 0; margin: 0; }
-  .topbar, .bottomnav, .btn, .no-print, .page-title { display: none !important; }
+  .topbar, .bottomnav, .btn, .no-print, .page-title, .section-h { display: none !important; }
   .page { padding: 0; max-width: 100%; }
   .card { box-shadow: none; border: 1px solid #000; border-radius: 0; margin: 0; padding: 20px; }
   .print-header { display: block !important; text-align: center; margin-bottom: 20px; }
@@ -157,8 +155,6 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('ar-EG',{year:'numeric',
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function toast(msg, type=''){ const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + type; clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2600); }
-function openModal(html){ $('#modalContent').innerHTML = html; $('#modal').classList.add('show'); }
-function closeModal(){ $('#modal').classList.remove('show'); }
 
 /* ============================================================
    2. UTILITIES (Arabic Numbers, Calculations)
@@ -284,7 +280,7 @@ function generateClaimsAndNotices(sampleId) {
 }
 
 /* ============================================================
-   3. SEED DATA (Simulates the full DB)
+   3. SEED DATA (Matches Section 15 & 16)
 ============================================================ */
 const BRANCH_NAMES = ['بنها','مركز بنها','طوخ','كفر شكر','قها','قليوب','شبين القناطر','القناطر الخيرية','الخصوص','غرب شبرا','شمال الخانكة','جنوب الخانكة'];
 const DEFAULT_TIERS = [
@@ -332,10 +328,6 @@ function seedIfEmpty(){
   DB.set('facilities', facilities);
   
   // Sample Data mapped to Acceptance Tests:
-  // Test 1: BOD=300 (Pass -> Analysis + Burden 4800)
-  // Test 2: TSS=500 (Pass -> Analysis + Burden 2400)
-  // Test 3: BOD=700, COD=1500 (Fail -> Burden 30240)
-  // Test 4: pH=1.5 (Fail -> Burden 48000)
   DB.set('inspections', [
     { id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
     { id:'i2', facility_id:'f2', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
