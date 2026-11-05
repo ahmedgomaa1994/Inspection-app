@@ -433,3 +433,453 @@ function layout(content, active){
 </script>
 </body>
 </html>
+/* ============================================================
+   5. VIEWS & ROUTES
+============================================================ */
+
+route('/login', () => {
+  $('#app').innerHTML = `
+    <div class="login-wrap">
+      <div class="login-box">
+        <div class="logo">م</div>
+        <h2>الرقابة على الصرف الصناعي</h2>
+        <p>القانون 93 لسنة 1962</p>
+        <form onsubmit="event.preventDefault(); login(this.u.value, this.p.value)">
+          <div class="field"><label>اسم المستخدم</label><input name="u" value="admin"></div>
+          <div class="field"><label>كلمة المرور</label><input name="p" type="password" value="1234"></div>
+          <button class="btn btn-primary btn-block btn-lg">دخول</button>
+        </form>
+        <div class="demo-users">
+          <b>حسابات تجريبية (1234)</b>
+          <div>مدير: <code>admin</code></div>
+          <div>رقابة: <code>supervisor</code></div>
+          <div>تحكم: <code>claims</code></div>
+          <div>تحصيل: <code>collection</code></div>
+          <div>تراخيص: <code>licensing</code></div>
+          <div>كيميائي: <code>chemist</code></div>
+        </div>
+      </div>
+    </div>`;
+});
+
+route('/home', () => {
+  const u = Session.user;
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const samples = DB.get('samples',[]).filter(s=>!s.deleted);
+  const claims = DB.get('claims',[]);
+  const plans = DB.get('plan_items',[]);
+  const notices = DB.get('compliance_notices',[]);
+  const payments = DB.get('payments',[]);
+  
+  let stats = [];
+  if(u.role === 'gm' || u.role === 'control_mgr'){
+    stats = [
+      {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
+      {num: claims.filter(c=>c.status==='draft').length, lbl:'مطالبات مسودة', warn: true},
+      {num: notices.filter(n=>n.status==='draft').length, lbl:'نماذج توفيق', warn: true},
+      {num: samples.filter(s=>s.status==='fail').length, lbl:'عينات غير مطابقة', warn: true}
+    ];
+  } else if (u.role === 'collection_mgr') {
+    stats = [
+      {num: claims.filter(c=>c.status==='approved').length, lbl:'مطالبات جاهزة'},
+      {num: payments.reduce((s,p)=>s+p.amount, 0), lbl:'تحصيل إجمالي'},
+      {num: 0, lbl:'متأخرات'},
+      {num: 0, lbl:'تحصيل اليوم'}
+    ];
+  } else {
+    stats = [
+      {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
+      {num: samples.filter(s=>s.status==='pending').length, lbl:'قيد الانتظار'},
+      {num: facs.length, lbl:'المنشآت'},
+      {num: 0, lbl:'مسوداتي'}
+    ];
+  }
+
+  const content = `
+    <div class="page-title">لوحة التحكم</div>
+    <div class="stats">${stats.map(s=>`<div class="stat ${s.warn?'warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <a href="#/inspection/new" class="btn btn-primary btn-lg">+ معاينة جديدة</a>
+      <a href="#/claims" class="btn btn-outline btn-lg">المطالبات</a>
+    </div>
+  `;
+  layout(content, 'الرئيسية');
+});
+
+route('/plans', () => {
+  const plans = DB.get('plan_items',[]);
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const grouped = plans.reduce((acc, p) => { if(!acc[p.date]) acc[p.date] = []; acc[p.date].push(p); return acc; }, {});
+  const sortedDates = Object.keys(grouped).sort();
+
+  const plansHTML = sortedDates.map(date => {
+    const items = grouped[date].map(p => {
+      const f = facs.find(x=>x.id===p.facility_id);
+      return `<div class="plan-item" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--border)">
+        <div><div style="font-weight:700">${esc(f?.name||'—')}</div><div class="tiny text-muted">${esc(DB.get('users',[]).find(x=>x.id===p.inspector_id)?.name||'—')}</div></div>
+        <div><span class="badge badge-yellow">${p.status}</span></div>
+      </div>`;
+    }).join('');
+    return `<div class="plan-day"><div class="section-h">📅 ${date === today() ? 'اليوم' : fmtDate(date)}</div>${items}</div>`;
+  }).join('') || '<div class="empty"><p>لا توجد بنود</p></div>';
+
+  layout(`<div class="page-title">خطة العمل</div>${plansHTML}`, 'الخطة');
+});
+
+route('/inspections', () => {
+  const insps = DB.get('inspections',[]).filter(i=>!i.deleted);
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const items = insps.map(i=>{
+    const f = facs.find(x=>x.id===i.facility_id);
+    return `<a class="item" href="#/inspection/${i.id}">
+      <div class="row"><div class="ttl">${esc(f?.name||'—')}</div><span class="badge badge-green">معتمد</span></div>
+      <div class="meta"><span>📅 ${fmtDate(i.inspection_date)}</span><span>🏢 ${esc(branchName(i.branch_id))}</span></div>
+    </a>`;
+  }).join('') || '<div class="empty"><p>لا توجد معاينات</p></div>';
+  layout(`<div class="page-title">المعاينات</div><a href="#/inspection/new" class="btn btn-primary btn-block btn-lg" style="margin-bottom:14px">+ معاينة جديدة</a>${items}`, 'المعاينات');
+});
+
+route('/inspection/new', () => renderInspectionForm());
+route('/inspection', (id) => renderInspectionForm(id));
+
+function renderInspectionForm(inspId){
+  const u = Session.user;
+  const existing = inspId ? DB.get('inspections',[]).find(i=>i.id===inspId) : null;
+  const fac = existing ? DB.get('facilities',[]).find(f=>f.id===existing.facility_id) : null;
+  const branches = DB.get('branches',[]).filter(b=>b.active);
+  const labs = DB.get('labs',[]);
+  const data = existing ? {...existing} : { reason:'plan', inspection_date: today(), branch_id: u.branch_id || branches[0].id, disposal_destination:'network', water_source_type:'gov' };
+  const f = fac || data;
+
+  const pumpRow = (p, i) => `
+    <div class="pump-row" data-pump="${i}">
+      <button type="button" class="rm" onclick="this.closest('[data-pump]').remove()">×</button>
+      <div class="grid2">
+        <div class="field"><label>القدرة (حصان)</label><input type="number" class="pump-hp" value="${p.hp||''}" min="1"></div>
+        <div class="field"><label>طريقة التشغيل</label>
+          <select class="pump-mode" onchange="if(this.value==='interrupt') this.closest('[data-pump]').querySelector('.hours-field').style.display='none'; else this.closest('[data-pump]').querySelector('.hours-field').style.display='block';">
+            <option value="hours" ${p.mode==='hours'?'selected':''}>ساعات يومياً</option>
+            <option value="interrupt" ${p.mode==='interrupt'?'selected':''}>عند انقطاع المياه فقط</option>
+          </select>
+        </div>
+      </div>
+      <div class="field hours-field" ${p.mode==='interrupt'?'style="display:none"':''}><label>عدد الساعات يومياً</label><input type="number" class="pump-hours" value="${p.hours||''}" min="1" max="24"></div>
+    </div>`;
+
+  const content = `
+    <div class="page-title">${existing?'تعديل معاينة':'معاينة جديدة'}</div>
+    <form id="inspForm" onsubmit="event.preventDefault(); saveInspection('${existing?.id||''}')">
+      
+      <div class="section-h">أ. بيانات المعاينة</div>
+      <div class="card">
+        <div class="field"><label>سبب المعاينة</label>
+          <select name="reason">
+            <option value="license" ${data.reason==='license'?'selected':''}>طلب توصيل</option>
+            <option value="plan" ${data.reason==='plan'?'selected':''}>خطة الإدارة</option>
+            <option value="survey" ${data.reason==='survey'?'selected':''}>مسح</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>تاريخ المعاينة</label><input type="date" name="inspection_date" value="${data.inspection_date}" required></div>
+          <div class="field"><label>الفرع</label>
+            <select name="branch_id">${branches.map(b=>`<option value="${b.id}" ${data.branch_id===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-h">ب. بيانات المنشأة</div>
+      <div class="card">
+        <div class="field"><label>اسم المنشأة <span class="req">*</span></label><input name="name" value="${esc(f.name||'')}" required></div>
+        <div class="field"><label>العنوان <span class="req">*</span></label><input name="address" value="${esc(f.address||'')}" required></div>
+        <div class="grid2">
+          <div class="field"><label>اسم المالك</label><input name="owner" value="${esc(f.owner||'')}" required></div>
+          <div class="field"><label>اسم المستأجر</label><input name="tenant" value="${esc(f.tenant||'')}"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>التصنيف</label>
+            <select name="classification">
+              <option value="commercial" ${f.classification==='commercial'?'selected':''}>تجارية</option>
+              <option value="industrial" ${f.classification==='industrial'?'selected':''}>صناعية</option>
+              <option value="other" ${f.classification==='other'?'selected':''}>أخرى</option>
+            </select>
+          </div>
+          <div class="field"><label>نوع النشاط</label><input name="activity" value="${esc(f.activity||'')}"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>عدد العاملين</label><input type="number" name="workers" value="${f.workers||''}" min="0"></div>
+          <div class="field"><label>عدد الورديات</label><input type="number" name="shifts" value="${f.shifts||''}" min="0"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>الإجازة الأسبوعية</label><input name="weekly_off" value="${esc(f.weekly_off||'')}"></div>
+          <div class="field"><label>أيام العمل بالشهر</label><input type="number" name="work_days" value="${f.work_days||26}" min="1" max="31"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>المسؤول في المنشأة</label><input name="responsible_name" value="${esc(f.responsible_name||'')}"></div>
+          <div class="field"><label>هاتف المسؤول</label><input type="tel" name="responsible_phone" value="${esc(f.responsible_phone||'')}"></div>
+        </div>
+        <div class="field"><label>متوسط استهلاك المياه الشهري (م³) <span class="req">*</span></label><input type="number" name="monthly_water_m3" value="${f.monthly_water_m3||''}" min="0" required></div>
+      </div>
+
+      <div class="section-h">ج. مصادر المياه</div>
+      <div class="card">
+        <div class="field"><label>نوع المصدر</label>
+          <select name="water_source_type" id="waterSourceType" onchange="toggleWaterSource()">
+            <option value="gov" ${f.water_source_type==='gov'?'selected':''}>حكومي فقط</option>
+            <option value="gw" ${f.water_source_type==='gw'?'selected':''}>جوفي فقط</option>
+            <option value="both" ${f.water_source_type==='both'?'selected':''}>حكومي وجوفي</option>
+          </select>
+        </div>
+        <div id="govSection">
+          <div class="field"><label>رقم حساب العميل</label><input name="gov_account" value="${esc(f.gov_account||'')}"></div>
+        </div>
+        <div id="gwSection" style="display:none">
+          <div class="field" style="display:flex;align-items:center;justify-content:space-between">
+            <label style="margin:0">الطلمبات</label>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addPump()">+ طلمبة</button>
+          </div>
+          <div id="pumpsContainer">${(f.pumps||[]).map((p,i)=>pumpRow(p,i)).join('')}</div>
+        </div>
+      </div>
+
+      <div class="section-h">د. الصرف</div>
+      <div class="card">
+        <div class="field"><label>نوعية الصرف</label>
+          <select name="disposal_type">
+            <option value="industrial" ${f.disposal_type==='industrial'?'selected':''}>صناعي</option>
+            <option value="domestic" ${f.disposal_type==='domestic'?'selected':''}>آدمي</option>
+            <option value="mixed" ${f.disposal_type==='mixed'?'selected':''}>خليط</option>
+          </select>
+        </div>
+        <div class="field"><label>جهة التوصيل</label>
+          <select name="disposal_destination">
+            <option value="network" ${f.disposal_destination==='network'?'selected':''}>على الشبكة</option>
+            <option value="company_tanker" ${f.disposal_destination==='company_tanker'?'selected':''}>كسح تابع للشركة</option>
+            <option value="external_tanker" ${f.disposal_destination==='external_tanker'?'selected':''}>كسح خارجي (إلغاء)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-h">هـ. العينات</div>
+      <div class="card">
+        <button type="button" class="btn btn-outline btn-sm" onclick="addSample()" style="margin-bottom:10px">+ إضافة عينة</button>
+        <div id="samplesContainer"></div>
+      </div>
+
+      <div class="section-h">و. النهاية</div>
+      <div class="card">
+        <div class="field"><label>ملاحظات المعاين</label><textarea name="notes">${esc(data.notes||'')}</textarea></div>
+      </div>
+
+      <div style="margin-top:16px;margin-bottom:20px"><button type="submit" class="btn btn-primary btn-block btn-lg">اعتماد وحفظ</button></div>
+    </form>
+  `;
+  layout(content, 'المعاينات');
+  setTimeout(()=>{ toggleWaterSource(); if(existing) { const sl = DB.get('samples',[]).filter(s=>s.inspection_id===inspId && !s.deleted); sl.forEach(s=>addSample(s)); } }, 50);
+}
+
+function toggleWaterSource(){
+  const t = $('#waterSourceType')?.value;
+  if(!t) return;
+  $('#govSection').style.display = (t==='gov'||t==='both') ? 'block' : 'none';
+  $('#gwSection').style.display = (t==='gw'||t==='both') ? 'block' : 'none';
+}
+
+function addPump(){
+  const c = $('#pumpsContainer'); const i = c.children.length;
+  c.insertAdjacentHTML('beforeend', `<div class="pump-row" data-pump="${i}">
+    <button type="button" class="rm" onclick="this.closest('[data-pump]').remove()">×</button>
+    <div class="grid2">
+      <div class="field"><label>القدرة (حصان)</label><input type="number" class="pump-hp" min="1"></div>
+      <div class="field"><label>طريقة التشغيل</label>
+        <select class="pump-mode" onchange="if(this.value==='interrupt') this.closest('[data-pump]').querySelector('.hours-field').style.display='none'; else this.closest('[data-pump]').querySelector('.hours-field').style.display='block';">
+          <option value="hours">ساعات يومياً</option>
+          <option value="interrupt">عند انقطاع المياه فقط</option>
+        </select>
+      </div>
+    </div>
+    <div class="field hours-field"><label>عدد الساعات يومياً</label><input type="number" class="pump-hours" min="1" max="24"></div>
+  </div>`);
+}
+
+function addSample(s){
+  const c = $('#samplesContainer');
+  const i = c.children.length;
+  const labs = DB.get('labs',[]);
+  const sdata = s || { code:'', type:'simple', outlet:'المخرج الرئيسي', lab_id: labs[0]?.id };
+  c.insertAdjacentHTML('beforeend', `<div class="sample-card" data-sample="${i}">
+    <button type="button" class="rm" onclick="this.closest('[data-sample]').remove()">×</button>
+    <div class="sample-code">${esc(sdata.code || 'كود تلقائي')}</div>
+    <div class="grid2">
+      <div class="field"><label>المخرج</label><input class="s-outlet" value="${esc(sdata.outlet)}"></div>
+      <div class="field"><label>المعمل</label><select class="s-lab">${labs.map(l=>`<option value="${l.id}" ${sdata.lab_id===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
+    </div>
+  </div>`);
+}
+
+function saveInspection(existingId){
+  const form = $('#inspForm');
+  const get = n => form.querySelector(`[name="${n}"]`)?.value || '';
+  const data = {
+    reason: get('reason'), inspection_date: get('inspection_date'), branch_id: get('branch_id'),
+    name: get('name').trim(), address: get('address').trim(), owner: get('owner').trim(), tenant: get('tenant').trim(),
+    classification: get('classification'), activity: get('activity').trim(),
+    workers: parseInt(get('workers')) || 0, shifts: parseInt(get('shifts')) || 0,
+    weekly_off: get('weekly_off').trim(), work_days: parseInt(get('work_days')) || 26,
+    responsible_name: get('responsible_name').trim(), responsible_phone: get('responsible_phone').trim(),
+    monthly_water_m3: parseFloat(get('monthly_water_m3')) || 0,
+    water_source_type: get('water_source_type'), gov_account: get('gov_account').trim(),
+    pumps: [...form.querySelectorAll('[data-pump]')].map(p=>({ hp: parseInt(p.querySelector('.pump-hp').value||'0'), mode: p.querySelector('.pump-mode').value, hours: parseInt(p.querySelector('.pump-hours')?.value||'0') })).filter(p=>p.hp>0),
+    disposal_type: get('disposal_type'), disposal_destination: get('disposal_destination'),
+    notes: get('notes').trim(),
+    samples: [...form.querySelectorAll('[data-sample]')].map(s=>({ type:'simple', outlet: s.querySelector('.s-outlet').value.trim(), lab_id: s.querySelector('.s-lab').value }))
+  };
+  const u = Session.user;
+
+  if(data.disposal_destination === 'external_tanker'){
+    DB.set('cancelled_inspections', [...DB.get('cancelled_inspections',[]), { id: uid(), ...data, cancelled_at: nowISO() }]);
+    toast('تم الحفظ في الملغاة','success'); location.hash='#/inspections'; return;
+  }
+
+  const facilities = DB.get('facilities',[]).filter(f=>!f.deleted);
+  let facilityId, facilityCode;
+  const dup = facilities.find(f => f.name===data.name && f.address===data.address);
+
+  if(dup){
+    facilityId = dup.id; facilityCode = dup.code;
+    const idx = facilities.findIndex(f=>f.id===dup.id);
+    facilities[idx] = {...facilities[idx], ...data};
+    DB.set('facilities', facilities);
+  } else {
+    const counters = DB.get('facility_code_counters', {});
+    const branch = DB.get('branches',[]).find(b=>b.id===data.branch_id);
+    counters[data.branch_id] = (counters[data.branch_id]||0) + 1;
+    DB.set('facility_code_counters', counters);
+    facilityCode = `${counters[data.branch_id]}/${branch.code}`;
+    facilityId = uid();
+    facilities.unshift({ id: facilityId, ...data, code: facilityCode, registered_at: nowISO(), deleted: false });
+    DB.set('facilities', facilities);
+  }
+
+  const samples = DB.get('samples',[]);
+  const branch = DB.get('branches',[]).find(b=>b.id===data.branch_id);
+  const yymmdd = new Date().toISOString().slice(2,10).replace(/-/g,'');
+  const approvalId = existingId || uid();
+  
+  data.samples.forEach(s => {
+    const rand = Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+    samples.unshift({ ...s, id: uid(), code: `${branch.code}-${yymmdd}-${rand}`, facility_id: facilityId, inspection_id: approvalId, collected_at: nowISO(), status:'pending', deleted: false });
+  });
+  DB.set('samples', samples);
+
+  const insps = DB.get('inspections', []);
+  if(existingId){
+    const idx = insps.findIndex(i=>i.id===existingId);
+    if(idx>=0) insps[idx] = {...insps[idx], ...data, facility_id:facilityId};
+  } else {
+    insps.unshift({ id: approvalId, ...data, facility_id:facilityId, inspector_id: u.id, status:'approved', inspection_date: data.inspection_date, deleted:false });
+  }
+  DB.set('inspections', insps);
+
+  toast(`تم الحفظ — كود: ${facilityCode}`,'success');
+  location.hash = '#/facility/' + facilityId;
+}
+
+route('/facilities', () => {
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const items = facs.map(f=>`
+    <a class="item" href="#/facility/${f.id}">
+      <div class="row"><div class="ttl">${esc(f.name)}</div><span class="badge badge-blue">${esc(f.code)}</span></div>
+      <div class="meta"><span>👤 ${esc(f.owner)}</span><span>🏢 ${esc(branchName(f.branch_id))}</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد منشآت</p></div>';
+  layout(`<div class="page-title">المنشآت</div>${items}`, 'المنشآت');
+});
+
+route('/facility', (id) => {
+  const f = DB.get('facilities',[]).find(x=>x.id===id);
+  if(!f){ toast('غير موجودة','error'); return; }
+  const samples = DB.get('samples',[]).filter(s=>s.facility_id===id && !s.deleted);
+  const sampleItems = samples.map(s=>`
+    <a class="item" href="#/sample/${s.id}">
+      <div class="row"><div class="ttl mono">${esc(s.code)}</div><span class="badge ${s.status==='pass'?'badge-green':s.status==='fail'?'badge-red':'badge-yellow'}">${s.status==='pass'?'مطابقة':s.status==='fail'?'غير مطابقة':'انتظار'}</span></div>
+    </a>`).join('') || '<div class="hint">لا توجد عينات</div>';
+  layout(`<div class="page-title">${esc(f.name)}</div><div class="card"><div>المالك: ${esc(f.owner)}</div><div>الاستهلاك: ${f.monthly_water_m3} م³/شهر</div></div><div class="section-h">العينات</div>${sampleItems}`, 'المنشآت');
+});
+
+route('/sample', (id) => {
+  const s = DB.get('samples',[]).find(x=>x.id===id);
+  if(!s){ toast('غير موجودة','error'); return; }
+  const f = DB.get('facilities',[]).find(x=>x.id===s.facility_id);
+  let result = DB.get('results',[]).find(r=>r.sample_id===id && !r.deleted);
+  const limits = DB.get('lab_limits', {});
+  const r = result || {};
+
+  const params = [
+    { key:'bod', label:'BOD', unit:'مجم/لتر', limit: limits.bod_max },
+    { key:'cod', label:'COD', unit:'مجم/لتر', limit: limits.cod_max },
+    { key:'tss', label:'TSS', unit:'مجم/لتر', limit: limits.tss_max },
+    { key:'og', label:'O&G', unit:'مجم/لتر', limit: limits.og_max },
+    { key:'ph', label:'pH', unit:'—', limit:`${limits.ph_min}-${limits.ph_max}` },
+    { key:'temperature', label:'الحرارة', unit:'°م', limit:null },
+    { key:'settle_10', label:'راسبة 10د', unit:'مل/لتر', limit:null },
+    { key:'settle_15', label:'راسبة 15د', unit:'مل/لتر', limit:null }
+  ];
+
+  const resultFormHTML = `
+    <div class="section-h">إدخال / تعديل النتائج</div>
+    <div class="card">
+      <form onsubmit="event.preventDefault(); saveResult('${s.id}')">
+        ${params.map(p=>`
+          <div class="res-row">
+            <div class="name">${p.label}<small>الحد: ${p.limit!==null?p.limit:'—'}</small></div>
+            <input type="number" step="0.01" name="p_${p.key}" value="${r[p.key]??''}" placeholder="—">
+          </div>
+        `).join('')}
+        <button class="btn btn-primary btn-block btn-lg" style="margin-top:16px">حفظ النتائج وتوليد المطالبات</button>
+      </form>
+    </div>
+  `;
+
+  layout(`
+    <div class="page-title">العينة <span class="badge ${s.status==='pass'?'badge-green':s.status==='fail'?'badge-red':'badge-yellow'}">${s.status}</span></div>
+    <div class="card"><div class="mono" style="font-size:16px;font-weight:800">${esc(s.code)}</div><div>المنشأة: ${esc(f?.name)}</div></div>
+    ${resultFormHTML}
+  `, 'المنشآت');
+});
+
+function saveResult(sampleId){
+  const form = document.querySelector('form');
+  const get = n => form.querySelector(`[name="${n}"]`)?.value;
+  const limits = DB.get('lab_limits');
+  const data = {
+    bod: parseFloat(get('p_bod'))||null, cod: parseFloat(get('p_cod'))||null, tss: parseFloat(get('p_tss'))||null,
+    og: parseFloat(get('p_og'))||null, ph: parseFloat(get('p_ph'))||null, temperature: parseFloat(get('p_temperature'))||null,
+    settle_10: parseFloat(get('p_settle_10'))||null, settle_15: parseFloat(get('p_settle_15'))||null
+  };
+  let pass = true;
+  if(data.bod!=null && data.bod > limits.bod_max) pass = false;
+  if(data.cod!=null && data.cod > limits.cod_max) pass = false;
+  if(data.tss!=null && data.tss > limits.tss_max) pass = false;
+  if(data.og!=null && data.og > limits.og_max) pass = false;
+  if(data.ph!=null && (data.ph < limits.ph_min || data.ph > limits.ph_max)) pass = false;
+
+  const results = DB.get('results',[]);
+  const existingIdx = results.findIndex(r=>r.sample_id===sampleId && !r.deleted);
+  const payload = { ...data, sample_id: sampleId, auto_status: pass ? 'pass' : 'fail', entered_by: Session.user.id, entered_at: nowISO(), deleted: false };
+  
+  if(existingIdx>=0){
+    payload.id = results[existingIdx].id;
+    results[existingIdx] = {...results[existingIdx], ...payload};
+  } else {
+    payload.id = uid();
+    results.unshift(payload);
+  }
+  DB.set('results', results);
+
+  const samples = DB.get('samples',[]);
+  const sIdx = samples.findIndex(s=>s.id===sampleId);
+  if(sIdx>=0){ samples[sIdx].status = payload.auto_status; DB.set('samples', samples); }
+
+  generateClaimsAndNotices(sampleId);
+  toast(pass ? 'مطابقة — تم الحفظ' : 'غير مطابقة — تم توليد المطالبات', pass?'success':'error');
+  router();
+}
