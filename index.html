@@ -883,3 +883,243 @@ function saveResult(sampleId){
   toast(pass ? 'مطابقة — تم الحفظ' : 'غير مطابقة — تم توليد المطالبات', pass?'success':'error');
   router();
 }
+/* ============================================================
+   6. CLAIMS, NOTICES & COLLECTION
+============================================================ */
+route('/claims', () => {
+  const claims = DB.get('claims',[]);
+  const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
+  
+  const items = claims.map(c=>`
+    <a class="item" href="#/claim/${c.id}">
+      <div class="row"><div class="ttl">${typeLabel[c.type] || c.type}</div><span class="badge ${c.status==='draft'?'badge-yellow':c.status==='approved'?'badge-green':'badge-blue'}">${c.status==='draft'?'مسودة':c.status==='approved'?'معتمد':'جاهز'}</span></div>
+      <div class="meta"><span class="mono">${esc(c.serial)}</span><span>💰 ${c.total.toFixed(2)} ج</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد مطالبات</p></div>';
+    
+  layout(`<div class="page-title">المطالبات المالية</div>${items}`, 'المزيد');
+});
+
+route('/claim', (id) => {
+  const c = DB.get('claims',[]).find(x=>x.id===id);
+  if(!c) return;
+  const f = DB.get('facilities',[]).find(x=>x.id===c.facility_id);
+  const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
+  
+  const linesHTML = c.lines.map(l=>`
+    <tr>
+      <td>${esc(l.label || l.param)}</td>
+      <td>${l.qty || l.months || 1}</td>
+      <td>${l.rate || l.tierRate || '—'}</td>
+      <td>${l.total.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  layout(`
+    <div class="page-title no-print">تفاصيل المطالبة</div>
+    <div class="card">
+      <div class="print-header" style="display:none;text-align:center;margin-bottom:20px">
+        <h2>إدارة الرقابة على الصرف الصناعي</h2>
+        <p>مطالبة مالية (${typeLabel[c.type]}) - رقم: ${c.serial}</p>
+      </div>
+      <div style="margin-bottom:15px">
+        <div><b>المنشأة:</b> ${esc(f?.name)}</div>
+        <div><b>الكود:</b> ${esc(f?.code)}</div>
+        <div><b>التاريخ:</b> ${fmtDate(c.date)}</div>
+      </div>
+      <table class="print-table" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:15px">
+        <thead>
+          <tr style="background:#f5f7fb">
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">الكمية/المهلة</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">الفئة</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>${linesHTML}</tbody>
+      </table>
+      <div style="text-align:left;font-weight:800;margin-bottom:10px">
+        <div>الإجمالي قبل الضريبة: ${c.base_amount.toFixed(2)} ج</div>
+        <div>الضريبة: ${c.vat_amount.toFixed(2)} ج</div>
+        <div style="color:var(--primary);font-size:16px">الإجمالي: ${c.total.toFixed(2)} ج</div>
+      </div>
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;font-size:13px;margin-bottom:15px">
+        <b>فقط: </b> ${numToArabicWords(c.total)}
+      </div>
+      <div class="print-footer" style="display:flex;justify-content:space-between;margin-top:30px;display:none">
+        <div style="text-align:center">توقيع المراجع<br><br>______________</div>
+        <div style="text-align:center">اعتماد المدير العام<br><br>______________</div>
+      </div>
+    </div>
+    <div class="no-print" style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary btn-block" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+      ${c.status==='draft'?`<button class="btn btn-outline btn-block" onclick="approveClaim('${c.id}')">✅ اعتماد</button>`:''}
+    </div>
+  `, 'المزيد');
+  
+  // تفعيل عرض عناصر الطباعة
+  document.querySelectorAll('.print-header, .print-footer').forEach(el => el.style.display = 'flex');
+});
+
+function approveClaim(id) {
+  const claims = DB.get('claims',[]);
+  const idx = claims.findIndex(x=>x.id===id);
+  if(idx>=0) { claims[idx].status = 'approved'; DB.set('claims', claims); router(); toast('تم الاعتماد', 'success'); }
+}
+
+route('/notices', () => {
+  const notices = DB.get('compliance_notices',[]);
+  const items = notices.map(n=>`
+    <a class="item" href="#/notice/${n.id}">
+      <div class="row"><div class="ttl">نموذج توفيق أوضاع</div><span class="badge badge-yellow">${n.status==='draft'?'مسودة':'تم التسليم'}</span></div>
+      <div class="meta"><span class="mono">${n.serial}</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد نماذج</p></div>';
+  layout(`<div class="page-title">نماذج توفيق الأوضاع</div>${items}`, 'المزيد');
+});
+
+route('/notice', (id) => {
+  const n = DB.get('compliance_notices',[]).find(x=>x.id===id);
+  if(!n) return;
+  const f = DB.get('facilities',[]).find(x=>x.id===n.facility_id);
+  const linesHTML = n.lines.map(l=>`
+    <tr>
+      <td>${esc(l.param)}</td>
+      <td>${l.value}</td>
+      <td>${l.tierRate}</td>
+      <td>${l.duration} ${l.durationUnit==='month'?'شهور':'أسابيع'}</td>
+    </tr>
+  `).join('');
+
+  layout(`
+    <div class="page-title no-print">نموذج توفيق أوضاع</div>
+    <div class="card">
+      <div class="print-header" style="display:none;text-align:center;margin-bottom:20px">
+        <h2>إدارة الرقابة على الصرف الصناعي</h2>
+        <p>نموذج توفيق أوضاع - رقم: ${n.serial}</p>
+      </div>
+      <div style="margin-bottom:15px">
+        <div><b>المنشأة:</b> ${esc(f?.name)}</div>
+        <div><b>الكود:</b> ${esc(f?.code)}</div>
+        <div><b>التاريخ:</b> ${fmtDate(n.date)}</div>
+      </div>
+      <p style="font-weight:700;margin:15px 0">يجب سرعة توفيق أوضاع المنشأة خلال شهر من تاريخ استلام هذا النموذج.</p>
+      <table class="print-table" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:15px">
+        <thead>
+          <tr style="background:#f5f7fb">
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">القيمة المقاسة</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">الحد الأقصى</th>
+            <th style="border:1px solid #ddd;padding:8px;text-align:right">المهلة</th>
+          </tr>
+        </thead>
+        <tbody>${linesHTML}</tbody>
+      </table>
+      <div class="print-footer" style="display:flex;justify-content:space-between;margin-top:30px;display:none">
+        <div style="text-align:center">اسم المستلم والتوقيع<br><br>______________</div>
+        <div style="text-align:center">ختم المنشأة<br><br>______________</div>
+      </div>
+    </div>
+    <div class="no-print" style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary btn-block" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+      ${n.status==='draft'?`<button class="btn btn-outline btn-block" onclick="deliverNotice('${n.id}')">✅ تم التسليم</button>`:''}
+    </div>
+  `, 'المزيد');
+  document.querySelectorAll('.print-header, .print-footer').forEach(el => el.style.display = 'flex');
+});
+
+function deliverNotice(id) {
+  const notices = DB.get('compliance_notices',[]);
+  const idx = notices.findIndex(x=>x.id===id);
+  if(idx>=0) { notices[idx].status = 'delivered'; DB.set('compliance_notices', notices); router(); toast('تم تسجيل التسليم', 'success'); }
+}
+
+route('/collection', () => {
+  const claims = DB.get('claims',[]).filter(c=>c.status==='approved');
+  const payments = DB.get('payments',[]);
+  
+  const items = claims.map(c=>{
+    const paid = payments.filter(p=>p.claim_id===c.id).reduce((s,p)=>s+p.amount,0);
+    const rem = c.total - paid;
+    return `<div class="item">
+      <div class="row"><div class="ttl">${esc(c.serial)}</div><span class="badge ${rem<=0?'badge-green':'badge-yellow'}">${rem<=0?'مسددة':'متبقي '+rem.toFixed(2)}</span></div>
+      <div class="meta"><span>💰 إجمالي: ${c.total.toFixed(2)} ج</span></div>
+      ${rem>0 ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="openPaymentModal('${c.id}', ${rem})">تسجيل دفعة</button>` : ''}
+    </div>`;
+  }).join('') || '<div class="empty"><p>لا توجد مطالبات معتمدة</p></div>';
+  
+  layout(`<div class="page-title">التحصيل</div>${items}`, 'المزيد');
+});
+
+function openPaymentModal(claimId, maxAmount) {
+  openModal(`
+    <div class="modal-h"><h3>تسجيل تحصيل</h3><button onclick="closeModal()">×</button></div>
+    <form onsubmit="event.preventDefault(); savePayment('${claimId}', this)">
+      <div class="field"><label>المبلغ المحصل (ج)</label><input type="number" name="amount" value="${maxAmount}" max="${maxAmount}" min="0.01" step="0.01" required></div>
+      <div class="field"><label>طريقة الدفع</label>
+        <select name="method">
+          <option value="cash">نقدي</option>
+          <option value="check">شيك</option>
+          <option value="transfer">تحويل بنكي</option>
+        </select>
+      </div>
+      <div class="field"><label>رقم الإيصال / الشيك</label><input name="ref" required></div>
+      <button class="btn btn-primary btn-block btn-lg" style="margin-top:16px">حفظ الدفعة</button>
+    </form>
+  `);
+}
+
+function savePayment(claimId, form) {
+  const payments = DB.get('payments',[]);
+  payments.push({
+    id: uid(), claim_id: claimId, amount: parseFloat(form.amount.value),
+    method: form.method.value, ref: form.ref.value, date: nowISO()
+  });
+  DB.set('payments', payments);
+  closeModal();
+  toast('تم تسجيل الدفعة بنجاح', 'success');
+  router();
+}
+
+/* ============================================================
+   7. MORE MENU & MISC
+============================================================ */
+route('/more', () => {
+  layout(`
+    <div class="page-title">المزيد</div>
+    <a class="item" href="#/claims"><div class="ttl">💰 المطالبات المالية</div></a>
+    <a class="item" href="#/notices"><div class="ttl">📋 نماذج توفيق الأوضاع</div></a>
+    <a class="item" href="#/collection"><div class="ttl">💵 التحصيل</div></a>
+    <a class="item" href="#/licenses"><div class="ttl">📄 التراخيص وطلبات التوصيل</div></a>
+    
+    <div style="margin-top:30px">
+      <button class="btn btn-danger btn-block" onclick="if(confirm('سيتم مسح كل البيانات والعودة للبيانات التجريبية. هل أنت متأكد؟')) { localStorage.clear(); location.reload(); }">🗑️ تصفير البيانات وإعادة التهيئة</button>
+    </div>
+    
+    <div class="card" style="margin-top:16px;text-align:center;color:var(--muted);font-size:12.5px">
+      إدارة الرقابة على الصرف الصناعي - النسخة الكاملة<br>
+      <div class="tiny" style="margin-top:8px">وفقاً للقانون 93 لسنة 1962</div>
+    </div>
+  `, 'المزيد');
+});
+
+// شاشة التراخيص (مبسطة لتجنب الخطأ 404)
+route('/licenses', () => {
+  const licenses = DB.get('licenses',[]);
+  const items = licenses.map(l=>`
+    <a class="item" href="#/license/${l.id}">
+      <div class="row"><div class="ttl">${esc(l.facility_name)}</div><span class="badge badge-blue">${l.status}</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد طلبات</p></div>';
+  layout(`<div class="page-title">التراخيص</div>${items}`, 'المزيد');
+});
+
+route('/license', (id) => {
+  const l = DB.get('licenses',[]).find(x=>x.id===id);
+  if(!l) return;
+  layout(`
+    <div class="page-title">${esc(l.facility_name)}</div>
+    <div class="card">
+      <div><b>رقم الطلب:</b> ${esc(l.request_no)}</div>
+      <div><b>المالك:</b> ${esc(l.owner)}</div>
+      <div><b>الحالة:</b> ${l.status}</div>
+    </div>
+  `, 'المزيد');
+});
