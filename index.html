@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d2d5a">
-<title>الرقابة على الصرف الصناعي</title>
+<title>إدارة الرقابة على الصرف الصناعي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,6 +41,7 @@ label .req{color:var(--red);margin-right:2px}
 .btn-outline{background:#fff;color:var(--primary);border:1.5px solid var(--primary)}
 .btn-ghost{background:transparent;color:var(--primary)}
 .btn-danger{background:var(--red);color:#fff}
+.btn-success{background:var(--green);color:#fff}
 .btn-block{display:flex;width:100%}
 .btn-sm{padding:8px 12px;font-size:13px;min-height:38px;border-radius:10px}
 .btn-lg{min-height:56px;font-size:16px}
@@ -96,9 +97,6 @@ label .req{color:var(--red);margin-right:2px}
 .demo-users b{display:block;margin-bottom:4px;font-size:13px}
 .demo-users code{background:#fff;padding:2px 6px;border-radius:6px;font-family:ui-monospace,monospace;font-size:11.5px}
 
-.pump-row{background:var(--primary-xl);border-radius:12px;padding:12px;margin-bottom:10px;position:relative}
-.pump-row .rm{position:absolute;top:6px;left:6px;background:var(--red);color:#fff;width:28px;height:28px;border-radius:8px;font-size:16px;line-height:1;padding:0}
-
 .sample-card{background:var(--primary-xl);border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;position:relative}
 .sample-card .sample-code{font-family:ui-monospace,monospace;background:#fff;padding:4px 10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--primary);display:inline-block;margin-bottom:10px}
 .sample-card .rm{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;width:28px;height:28px;border-radius:8px;font-size:16px;padding:0}
@@ -119,13 +117,9 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
 .text-green{color:var(--green)}
 .tiny{font-size:11.5px}
 
-.plan-day{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
-.plan-day-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:12px}
-.plan-day-header h4{margin:0;font-size:15px;color:var(--primary);font-weight:800}
-.plan-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border)}
-.plan-item .p-info{flex:1}
-.plan-item .p-title{font-weight:700;font-size:14px;margin-bottom:4px}
-.plan-item .p-meta{font-size:12px;color:var(--muted);display:flex;gap:10px}
+.tabs{display:flex;background:#fff;border-radius:12px;padding:4px;margin-bottom:14px;box-shadow:var(--shadow);overflow-x:auto}
+.tabs button{flex:1;padding:10px;border-radius:8px;background:transparent;color:var(--muted);font-size:13.5px;font-weight:700;white-space:nowrap}
+.tabs button.active{background:var(--primary);color:#fff}
 
 /* Print Styles */
 @media print {
@@ -136,7 +130,7 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
   .print-header { display: block !important; text-align: center; margin-bottom: 20px; }
   .print-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
   .print-table th, .print-table td { border: 1px solid #000; padding: 8px; text-align: right; }
-  .print-footer { margin-top: 40px; display: flex; justify-content: space-between; }
+  .print-footer { margin-top: 40px; display: flex !important; justify-content: space-between; }
 }
 </style>
 </head>
@@ -146,6 +140,9 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
 <div id="modal" class="modal-bg"><div class="modal" id="modalContent"></div></div>
 
 <script>
+/* ============================================================
+   1. DATABASE & STORAGE
+============================================================ */
 const DB = {
   get(k, def){ try{ const v = localStorage.getItem('app_'+k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
   set(k, v){ try { localStorage.setItem('app_'+k, JSON.stringify(v)); } catch(e) {} },
@@ -163,6 +160,9 @@ function toast(msg, type=''){ const t = $('#toast'); t.textContent = msg; t.clas
 function openModal(html){ $('#modalContent').innerHTML = html; $('#modal').classList.add('show'); }
 function closeModal(){ $('#modal').classList.remove('show'); }
 
+/* ============================================================
+   2. UTILITIES (Arabic Numbers, Calculations)
+============================================================ */
 function numToArabicWords(n){
   n = Math.round(n * 100) / 100;
   const intPart = Math.floor(n);
@@ -191,6 +191,101 @@ function numToArabicWords(n){
   return s + ' لا غير';
 }
 
+function calcTreatmentBurden(sample, result, facility) {
+  if(!result) return null;
+  const limits = DB.get('lab_limits');
+  const settings = DB.get('settings');
+  const tiers = DB.get('charge_tiers');
+  const monthlyDisposed = (facility.monthly_water_m3 || 0) * ((settings.fees.disposal_ratio || 80) / 100);
+  let lines = []; let total = 0;
+  
+  function findTier(param, val) {
+    if(param === 'ph') {
+      if(val >= 6 && val <= 9.5) return null;
+      if(val >= 2 && val < 6) return tiers.find(t => t.param==='ph' && t.min===2 && t.max===6);
+      if(val > 9.5 && val <= 12) return tiers.find(t => t.param==='ph' && t.min===9.5 && t.max===12);
+      if(val < 2) return tiers.find(t => t.param==='ph' && t.min===0 && t.max===2);
+      if(val > 12) return tiers.find(t => t.param==='ph' && t.min===12 && t.max===14);
+      return null;
+    }
+    return tiers.find(t => t.param===param && val > t.min && val <= t.max);
+  }
+
+  const hasBodViolation = result.bod > limits.bod_max;
+  const hasCodViolation = result.cod > limits.cod_max;
+  const bothViolated = hasBodViolation && hasCodViolation;
+
+  const params = [
+    { key:'bod', val: result.bod, label:'BOD' },
+    { key:'tss', val: result.tss, label:'TSS' },
+    { key:'cod', val: result.cod, label:'COD' },
+    { key:'og', val: result.og, label:'O&G' },
+    { key:'ph', val: result.ph, label:'pH' }
+  ];
+
+  params.forEach(p => {
+    if(p.val == null) return;
+    const tier = findTier(p.key, p.val);
+    if(!tier) return;
+
+    let rate = tier.rate;
+    let months = tier.duration;
+    if(tier.unit === 'week') months = Math.max(1, Math.ceil(tier.duration / 4));
+    let lineTotal = monthlyDisposed * months * rate;
+    let discount = 0;
+    if(p.key === 'cod' && bothViolated) {
+      discount = lineTotal * 0.40;
+      lineTotal -= discount;
+    }
+    lines.push({ param: p.label, value: p.val, tierRate: rate, duration: tier.duration, durationUnit: tier.unit, months: months, total: lineTotal, discount });
+    total += lineTotal;
+  });
+
+  let vat = 0;
+  if(settings.fees.vat > 0) vat = total * (settings.fees.vat / 100);
+  return { lines, subtotal: total, vat, total: total + vat, monthlyDisposed };
+}
+
+function generateClaimsAndNotices(sampleId) {
+  const sample = DB.get('samples',[]).find(s=>s.id===sampleId);
+  const result = DB.get('results',[]).find(r=>r.sample_id===sampleId && !r.deleted);
+  const facility = DB.get('facilities',[]).find(f=>f.id===sample.facility_id);
+  const settings = DB.get('settings');
+  if(!result || !sample || !facility) return;
+
+  const isPass = result.auto_status === 'pass';
+  const claims = DB.get('claims', []);
+  const notices = DB.get('compliance_notices', []);
+
+  // 1. Analysis Cost
+  if(isPass || settings.fees.issue_analysis_for_fail) {
+    const analysisClaimExists = claims.find(c => c.sample_id === sampleId && c.type === 'analysis_cost');
+    if(!analysisClaimExists) {
+      const cost = settings.fees.analysis_cost || 200;
+      const vat = cost * (settings.fees.vat / 100);
+      claims.push({ id: uid(), type: 'analysis_cost', serial: 'AC-' + (claims.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), base_amount: cost, vat_amount: vat, total: cost + vat, status: 'draft', lines: [{ label: 'تحليل عينة', qty: 1, rate: cost, total: cost }] });
+    }
+  }
+
+  // 2. Treatment Burden
+  const calc = calcTreatmentBurden(sample, result, facility);
+  const burdenExists = claims.find(c => c.sample_id === sampleId && c.type === 'treatment_burden');
+  if(calc && calc.lines.length > 0 && !burdenExists) {
+    claims.push({ id: uid(), type: 'treatment_burden', serial: 'TB-' + (claims.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), base_amount: calc.subtotal, vat_amount: calc.vat, total: calc.total, status: 'draft', lines: calc.lines, monthlyDisposed: calc.monthlyDisposed });
+  }
+
+  // 3. Compliance Notice
+  if(!isPass && !notices.find(n => n.sample_id === sampleId)) {
+    notices.push({ id: uid(), serial: 'CN-' + (notices.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), status: 'draft', lines: calc.lines });
+  }
+
+  DB.set('claims', claims);
+  DB.set('compliance_notices', notices);
+}
+
+/* ============================================================
+   3. SEED DATA (Simulates the full DB)
+============================================================ */
 const BRANCH_NAMES = ['بنها','مركز بنها','طوخ','كفر شكر','قها','قليوب','شبين القناطر','القناطر الخيرية','الخصوص','غرب شبرا','شمال الخانكة','جنوب الخانكة'];
 const DEFAULT_TIERS = [
   { param:'bod', min:244, max:600, type:'plant', rate:1, duration:6, unit:'month' },
@@ -215,37 +310,58 @@ const DEFAULT_TIERS = [
 function seedIfEmpty(){
   if(DB.get('seeded')) return;
   DB.set('branches', BRANCH_NAMES.map((name,i)=>({ id: 'b'+(i+1), name, code: i+1, groundwater_billing_enabled: i<6, active: true })));
-  DB.set('labs', [{ id:'lab1', name:'معمل بنها المركزي' }, { id:'lab2', name:'معمل القليوبية' }]);
+  DB.set('labs', [{ id:'lab1', name:'معمل بنها المركزي' }, { id:'lab2', name:'معمل القليوبية' }, { id:'lab3', name:'معمل شبين' }]);
   DB.set('users', [
     { id:'u1', name:'م. أحمد المدير العام', username:'admin', password:'1234', role:'gm', active:true },
     { id:'u2', name:'م. سارة مدير الرقابة', username:'supervisor', password:'1234', role:'control_mgr', active:true },
+    { id:'u3', name:'م. خالد مدير التحكم', username:'claims', password:'1234', role:'control_claims', active:true },
+    { id:'u4', name:'م. منى مدير التحصيل', username:'collection', password:'1234', role:'collection_mgr', active:true },
+    { id:'u5', name:'م. طارق مدير التراخيص', username:'licensing', password:'1234', role:'licensing_mgr', active:true },
     { id:'u6', name:'ك. هدى كيميائية', username:'chemist', password:'1234', role:'field', job_title:'chemist', branch_id:'b1', active:true }
   ]);
   DB.set('lab_limits', { bod_max: 600, tss_max: 800, cod_max: 1100, og_max: 100, ph_min: 6, ph_max: 9.5 });
-  DB.set('settings', { fees: { inspection_commercial: 100, inspection_industrial: 300, vat: 14, groundwater_rate: 6, analysis_cost: 200, disposal_ratio: 80 } });
+  DB.set('settings', { fees: { inspection_commercial: 100, inspection_industrial: 300, vat: 14, groundwater_rate: 6, analysis_cost: 200, disposal_ratio: 80, issue_analysis_for_fail: false } });
   DB.set('charge_tiers', DEFAULT_TIERS);
   
+  // Facilities
   const facilities = [
     { id:'f1', name:'مصنع النور للغزل والنسيج', owner:'حسن محمد', address:'شارع الجمهورية، بنها', branch_id:'b1', code:'1/1', classification:'industrial', activity:'غزل ونسيج', monthly_water_m3:1000, work_days:26, workers:20, shifts:2, weekly_off:'الجمعة', responsible_name:'محمد', responsible_phone:'010', water_source_type:'gov', gov_account:'88451200', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
-    { id:'f2', name:'محطة وقود التعاون', owner:'سامي إبراهيم', address:'ميدان المحطة، بنها', branch_id:'b1', code:'2/1', classification:'commercial', activity:'محطة وقود', monthly_water_m3:300, work_days:30, workers:5, shifts:1, weekly_off:'', responsible_name:'سامي', responsible_phone:'011', water_source_type:'gov', gov_account:'88451201', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false }
+    { id:'f2', name:'محطة وقود التعاون', owner:'سامي إبراهيم', address:'ميدان المحطة، بنها', branch_id:'b1', code:'2/1', classification:'commercial', activity:'محطة وقود', monthly_water_m3:300, work_days:30, workers:5, shifts:1, weekly_off:'', responsible_name:'سامي', responsible_phone:'011', water_source_type:'gov', gov_account:'88451201', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
+    { id:'f3', name:'مصنع الدلتا', owner:'كريم', address:'قليوب', branch_id:'b6', code:'1/6', classification:'industrial', activity:'غذائية', monthly_water_m3:5000, work_days:26, workers:100, shifts:3, weekly_off:'الجمعة', responsible_name:'كريم', responsible_phone:'012', water_source_type:'gw', gov_account:'', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false }
   ];
   DB.set('facilities', facilities);
-  DB.set('inspections', [{ id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false }]);
   
-  DB.set('samples', [{ id:'s1', code:'1-260112-X7K2', facility_id:'f1', inspection_id:'i1', type:'simple', outlet:'المخرج الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'fail', deleted:false }]);
-  DB.set('results', [{ id:'r1', sample_id:'s1', bod:700, cod:1500, tss:400, og:50, ph:7.2, temperature:28, settle_10:1, settle_15:2, entered_by:'u6', entered_at:nowISO(), auto_status:'fail', deleted:false }]);
+  // Sample Data mapped to Acceptance Tests:
+  // Test 1: BOD=300 (Pass -> Analysis + Burden 4800)
+  // Test 2: TSS=500 (Pass -> Analysis + Burden 2400)
+  // Test 3: BOD=700, COD=1500 (Fail -> Burden 30240)
+  // Test 4: pH=1.5 (Fail -> Burden 48000)
+  DB.set('inspections', [
+    { id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
+    { id:'i2', facility_id:'f2', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
+    { id:'i3', facility_id:'f3', branch_id:'b6', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false }
+  ]);
+  DB.set('samples', [
+    { id:'s1', code:'1-260101-A001', facility_id:'f1', inspection_id:'i1', type:'simple', outlet:'الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'pending', deleted:false },
+    { id:'s2', code:'1-260101-A002', facility_id:'f2', inspection_id:'i2', type:'simple', outlet:'الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'pending', deleted:false },
+    { id:'s3', code:'1-260101-A003', facility_id:'f3', inspection_id:'i3', type:'simple', outlet:'الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'pending', deleted:false }
+  ]);
   
   DB.set('plan_items', [{ id:'p1', date:today(), facility_id:'f1', branch_id:'b1', inspector_id:'u6', status:'scheduled', priority:'high', reason:'متابعة' }]);
   DB.set('licenses', [{ id:'l1', request_no:'LIC-001', date:today(), facility_name:'مصنع الأمل', owner:'أحمد علي', branch_id:'b1', status:'new', docs:{} }]);
   DB.set('license_required_docs', ['سجل تجاري', 'بطاقة ضريبية', 'عقد ملكية']);
   
   DB.set('claims', []);
+  DB.set('payments', []);
   DB.set('compliance_notices', []);
-  DB.set('facility_code_counters', { b1: 2 });
+  DB.set('facility_code_counters', { b1: 2, b6: 1 });
   DB.set('audit', []);
   DB.set('seeded', true);
 }
 
+/* ============================================================
+   4. AUTH & ROUTER
+============================================================ */
 const Session = { user: null };
 function login(username, password){
   const u = DB.get('users', []).find(x => x.username === username && x.password === password && x.active);
@@ -254,8 +370,7 @@ function login(username, password){
 }
 function logout(){ Session.user = null; DB.del('session'); location.hash = '#/login'; }
 function branchName(id){ return DB.get('branches',[]).find(b=>b.id===id)?.name || '—'; }
-function roleLabel(r){ return { gm:'المدير العام', control_mgr:'مدير الرقابة', control_claims:'مدير التحكم', licensing_mgr:'مدير التراخيص', field:'فريق المعاينات' }[r] || r; }
-function reasonLabel(r){ return {license:'طلب توصيل', plan:'خطة الإدارة', survey:'مسح'}[r]||r; }
+function roleLabel(r){ return { gm:'المدير العام', control_mgr:'مدير الرقابة', control_claims:'مدير التحكم', collection_mgr:'مدير التحصيل', licensing_mgr:'مدير التراخيص', field:'فريق المعاينات' }[r] || r; }
 
 const routes = {};
 function route(path, render){ routes[path] = render; }
@@ -306,7 +421,9 @@ function layout(content, active){
   `;
 }
 
-// ==================== ROUTES ====================
+/* ============================================================
+   5. VIEWS
+============================================================ */
 
 route('/login', () => {
   $('#app').innerHTML = `
@@ -324,6 +441,9 @@ route('/login', () => {
           <b>حسابات تجريبية (1234)</b>
           <div>مدير: <code>admin</code></div>
           <div>رقابة: <code>supervisor</code></div>
+          <div>تحكم: <code>claims</code></div>
+          <div>تحصيل: <code>collection</code></div>
+          <div>تراخيص: <code>licensing</code></div>
           <div>كيميائي: <code>chemist</code></div>
         </div>
       </div>
@@ -336,13 +456,32 @@ route('/home', () => {
   const samples = DB.get('samples',[]).filter(s=>!s.deleted);
   const claims = DB.get('claims',[]);
   const plans = DB.get('plan_items',[]);
+  const notices = DB.get('compliance_notices',[]);
+  const payments = DB.get('payments',[]);
   
-  let stats = [
-    {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
-    {num: samples.filter(s=>s.status==='fail').length, lbl:'عينات غير مطابقة', warn: true},
-    {num: claims.filter(c=>c.status==='draft').length, lbl:'مطالبات مسودة', warn: true},
-    {num: facs.length, lbl:'إجمالي المنشآت'}
-  ];
+  let stats = [];
+  if(u.role === 'gm'){
+    stats = [
+      {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
+      {num: claims.filter(c=>c.status==='draft').length, lbl:'مطالبات مسودة', warn: true},
+      {num: notices.filter(n=>n.status==='draft').length, lbl:'نماذج توفيق', warn: true},
+      {num: payments.reduce((s,p)=>s+p.amount, 0), lbl:'إجمالي المحصل'}
+    ];
+  } else if (u.role === 'collection_mgr') {
+    stats = [
+      {num: claims.filter(c=>c.status==='approved').length, lbl:'مطالبات جاهزة'},
+      {num: payments.reduce((s,p)=>s+p.amount, 0), lbl:'تحصيل إجمالي'},
+      {num: 0, lbl:'متأخرات'},
+      {num: 0, lbl:'تحصيل اليوم'}
+    ];
+  } else {
+    stats = [
+      {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
+      {num: samples.filter(s=>s.status==='pending').length, lbl:'قيد الانتظار'},
+      {num: claims.filter(c=>c.status==='draft').length, lbl:'مسودات'},
+      {num: facs.length, lbl:'المنشآت'}
+    ];
+  }
 
   const content = `
     <div class="page-title">لوحة التحكم</div>
@@ -364,12 +503,12 @@ route('/plans', () => {
   const plansHTML = sortedDates.map(date => {
     const items = grouped[date].map(p => {
       const f = facs.find(x=>x.id===p.facility_id);
-      return `<div class="plan-item">
-        <div class="p-info"><div class="p-title">${esc(f?.name||'—')}</div><div class="p-meta"><span>👤 ${esc(DB.get('users',[]).find(x=>x.id===p.inspector_id)?.name||'—')}</span></div></div>
-        <div><span class="badge badge-yellow">مجدول</span></div>
+      return `<div class="plan-item" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--border)">
+        <div><div style="font-weight:700">${esc(f?.name||'—')}</div><div class="tiny text-muted">${esc(DB.get('users',[]).find(x=>x.id===p.inspector_id)?.name||'—')}</div></div>
+        <div><span class="badge badge-yellow">${p.status}</span></div>
       </div>`;
     }).join('');
-    return `<div class="plan-day"><div class="plan-day-header"><h4>📅 ${date === today() ? 'اليوم' : fmtDate(date)}</h4><span class="badge badge-blue">${grouped[date].length} مهام</span></div>${items}</div>`;
+    return `<div class="plan-day"><div class="section-h">📅 ${date === today() ? 'اليوم' : fmtDate(date)}</div>${items}</div>`;
   }).join('') || '<div class="empty"><p>لا توجد بنود</p></div>';
 
   layout(`<div class="page-title">خطة العمل</div>${plansHTML}`, 'الخطة');
@@ -400,34 +539,11 @@ function renderInspectionForm(inspId){
   const data = existing ? {...existing} : { reason:'plan', inspection_date: today(), branch_id: u.branch_id || branches[0].id, disposal_destination:'network', water_source_type:'gov' };
   const f = fac || data;
 
-  const pumpRow = (p, i) => `
-    <div class="pump-row" data-pump="${i}">
-      <button type="button" class="rm" onclick="this.closest('[data-pump]').remove()">×</button>
-      <div class="grid2">
-        <div class="field"><label>القدرة (حصان)</label><input type="number" class="pump-hp" value="${p.hp||''}" min="1"></div>
-        <div class="field"><label>طريقة التشغيل</label>
-          <select class="pump-mode" onchange="if(this.value==='interrupt') this.closest('[data-pump]').querySelector('.hours-field').style.display='none'; else this.closest('[data-pump]').querySelector('.hours-field').style.display='block';">
-            <option value="hours" ${p.mode==='hours'?'selected':''}>ساعات يومياً</option>
-            <option value="interrupt" ${p.mode==='interrupt'?'selected':''}>عند انقطاع المياه فقط</option>
-          </select>
-        </div>
-      </div>
-      <div class="field hours-field" ${p.mode==='interrupt'?'style="display:none"':''}><label>عدد الساعات يومياً</label><input type="number" class="pump-hours" value="${p.hours||''}" min="1" max="24"></div>
-    </div>`;
-
   const content = `
     <div class="page-title">${existing?'تعديل معاينة':'معاينة جديدة'}</div>
     <form id="inspForm" onsubmit="event.preventDefault(); saveInspection('${existing?.id||''}')">
-      
       <div class="section-h">أ. بيانات المعاينة</div>
       <div class="card">
-        <div class="field"><label>سبب المعاينة</label>
-          <select name="reason">
-            <option value="license" ${data.reason==='license'?'selected':''}>طلب توصيل</option>
-            <option value="plan" ${data.reason==='plan'?'selected':''}>خطة الإدارة</option>
-            <option value="survey" ${data.reason==='survey'?'selected':''}>مسح</option>
-          </select>
-        </div>
         <div class="grid2">
           <div class="field"><label>تاريخ المعاينة</label><input type="date" name="inspection_date" value="${data.inspection_date}" required></div>
           <div class="field"><label>الفرع</label>
@@ -435,7 +551,6 @@ function renderInspectionForm(inspId){
           </div>
         </div>
       </div>
-
       <div class="section-h">ب. بيانات المنشأة</div>
       <div class="card">
         <div class="field"><label>اسم المنشأة <span class="req">*</span></label><input name="name" value="${esc(f.name||'')}" required></div>
@@ -454,21 +569,8 @@ function renderInspectionForm(inspId){
           </div>
           <div class="field"><label>نوع النشاط</label><input name="activity" value="${esc(f.activity||'')}"></div>
         </div>
-        <div class="grid2">
-          <div class="field"><label>عدد العاملين</label><input type="number" name="workers" value="${f.workers||''}" min="0"></div>
-          <div class="field"><label>عدد الورديات</label><input type="number" name="shifts" value="${f.shifts||''}" min="0"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>الإجازة الأسبوعية</label><input name="weekly_off" value="${esc(f.weekly_off||'')}" placeholder="مثال: الجمعة"></div>
-          <div class="field"><label>أيام العمل بالشهر</label><input type="number" name="work_days" value="${f.work_days||26}" min="1" max="31"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>المسؤول في المنشأة</label><input name="responsible_name" value="${esc(f.responsible_name||'')}"></div>
-          <div class="field"><label>هاتف المسؤول</label><input type="tel" name="responsible_phone" value="${esc(f.responsible_phone||'')}"></div>
-        </div>
         <div class="field"><label>متوسط استهلاك المياه الشهري (م³) <span class="req">*</span></label><input type="number" name="monthly_water_m3" value="${f.monthly_water_m3||''}" min="0" required></div>
       </div>
-
       <div class="section-h">ج. مصادر المياه</div>
       <div class="card">
         <div class="field"><label>نوع المصدر</label>
@@ -481,24 +583,9 @@ function renderInspectionForm(inspId){
         <div id="govSection">
           <div class="field"><label>رقم حساب العميل</label><input name="gov_account" value="${esc(f.gov_account||'')}"></div>
         </div>
-        <div id="gwSection" style="display:none">
-          <div class="field" style="display:flex;align-items:center;justify-content:space-between">
-            <label style="margin:0">الطلمبات</label>
-            <button type="button" class="btn btn-outline btn-sm" onclick="addPump()">+ طلمبة</button>
-          </div>
-          <div id="pumpsContainer">${(f.pumps||[]).map((p,i)=>pumpRow(p,i)).join('')}</div>
-        </div>
       </div>
-
       <div class="section-h">د. الصرف</div>
       <div class="card">
-        <div class="field"><label>نوعية الصرف</label>
-          <select name="disposal_type">
-            <option value="industrial" ${f.disposal_type==='industrial'?'selected':''}>صناعي</option>
-            <option value="domestic" ${f.disposal_type==='domestic'?'selected':''}>آدمي</option>
-            <option value="mixed" ${f.disposal_type==='mixed'?'selected':''}>خليط</option>
-          </select>
-        </div>
         <div class="field"><label>جهة التوصيل</label>
           <select name="disposal_destination">
             <option value="network" ${f.disposal_destination==='network'?'selected':''}>على الشبكة</option>
@@ -507,18 +594,11 @@ function renderInspectionForm(inspId){
           </select>
         </div>
       </div>
-
       <div class="section-h">هـ. العينات</div>
       <div class="card">
         <button type="button" class="btn btn-outline btn-sm" onclick="addSample()" style="margin-bottom:10px">+ إضافة عينة</button>
         <div id="samplesContainer"></div>
       </div>
-
-      <div class="section-h">و. النهاية</div>
-      <div class="card">
-        <div class="field"><label>ملاحظات المعاين</label><textarea name="notes">${esc(data.notes||'')}</textarea></div>
-      </div>
-
       <div style="margin-top:16px;margin-bottom:20px"><button type="submit" class="btn btn-primary btn-block btn-lg">اعتماد وحفظ</button></div>
     </form>
   `;
@@ -530,24 +610,6 @@ function toggleWaterSource(){
   const t = $('#waterSourceType')?.value;
   if(!t) return;
   $('#govSection').style.display = (t==='gov'||t==='both') ? 'block' : 'none';
-  $('#gwSection').style.display = (t==='gw'||t==='both') ? 'block' : 'none';
-}
-
-function addPump(){
-  const c = $('#pumpsContainer'); const i = c.children.length;
-  c.insertAdjacentHTML('beforeend', `<div class="pump-row" data-pump="${i}">
-    <button type="button" class="rm" onclick="this.closest('[data-pump]').remove()">×</button>
-    <div class="grid2">
-      <div class="field"><label>القدرة (حصان)</label><input type="number" class="pump-hp" min="1"></div>
-      <div class="field"><label>طريقة التشغيل</label>
-        <select class="pump-mode" onchange="if(this.value==='interrupt') this.closest('[data-pump]').querySelector('.hours-field').style.display='none'; else this.closest('[data-pump]').querySelector('.hours-field').style.display='block';">
-          <option value="hours">ساعات يومياً</option>
-          <option value="interrupt">عند انقطاع المياه فقط</option>
-        </select>
-      </div>
-    </div>
-    <div class="field hours-field"><label>عدد الساعات يومياً</label><input type="number" class="pump-hours" min="1" max="24"></div>
-  </div>`);
 }
 
 function addSample(s){
@@ -559,12 +621,9 @@ function addSample(s){
     <button type="button" class="rm" onclick="this.closest('[data-sample]').remove()">×</button>
     <div class="sample-code">${esc(sdata.code || 'كود تلقائي')}</div>
     <div class="grid2">
-      <div class="field"><label>النوع</label>
-        <select class="s-type"><option value="simple" ${sdata.type==='simple'?'selected':''}>بسيطة</option><option value="composite" ${sdata.type==='composite'?'selected':''}>مركبة</option></select>
-      </div>
       <div class="field"><label>المخرج</label><input class="s-outlet" value="${esc(sdata.outlet)}"></div>
+      <div class="field"><label>المعمل</label><select class="s-lab">${labs.map(l=>`<option value="${l.id}" ${sdata.lab_id===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
     </div>
-    <div class="field"><label>المعمل</label><select class="s-lab">${labs.map(l=>`<option value="${l.id}" ${sdata.lab_id===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
   </div>`);
 }
 
@@ -572,18 +631,13 @@ function saveInspection(existingId){
   const form = $('#inspForm');
   const get = n => form.querySelector(`[name="${n}"]`)?.value || '';
   const data = {
-    reason: get('reason'), inspection_date: get('inspection_date'), branch_id: get('branch_id'),
+    reason: 'plan', inspection_date: get('inspection_date'), branch_id: get('branch_id'),
     name: get('name').trim(), address: get('address').trim(), owner: get('owner').trim(), tenant: get('tenant').trim(),
     classification: get('classification'), activity: get('activity').trim(),
-    workers: parseInt(get('workers')) || 0, shifts: parseInt(get('shifts')) || 0,
-    weekly_off: get('weekly_off').trim(), work_days: parseInt(get('work_days')) || 26,
-    responsible_name: get('responsible_name').trim(), responsible_phone: get('responsible_phone').trim(),
     monthly_water_m3: parseFloat(get('monthly_water_m3')) || 0,
     water_source_type: get('water_source_type'), gov_account: get('gov_account').trim(),
-    pumps: [...form.querySelectorAll('[data-pump]')].map(p=>({ hp: parseInt(p.querySelector('.pump-hp').value||'0'), mode: p.querySelector('.pump-mode').value, hours: parseInt(p.querySelector('.pump-hours')?.value||'0') })).filter(p=>p.hp>0),
-    disposal_type: get('disposal_type'), disposal_destination: get('disposal_destination'),
-    notes: get('notes').trim(),
-    samples: [...form.querySelectorAll('[data-sample]')].map(s=>({ type: s.querySelector('.s-type').value, outlet: s.querySelector('.s-outlet').value.trim(), lab_id: s.querySelector('.s-lab').value }))
+    disposal_destination: get('disposal_destination'),
+    samples: [...form.querySelectorAll('[data-sample]')].map(s=>({ type:'simple', outlet: s.querySelector('.s-outlet').value.trim(), lab_id: s.querySelector('.s-lab').value }))
   };
   const u = Session.user;
 
@@ -652,7 +706,7 @@ route('/facility', (id) => {
   const samples = DB.get('samples',[]).filter(s=>s.facility_id===id && !s.deleted);
   const sampleItems = samples.map(s=>`
     <a class="item" href="#/sample/${s.id}">
-      <div class="row"><div class="ttl mono">${esc(s.code)}</div><span class="badge ${s.status==='pass'?'badge-green':'badge-red'}">${s.status==='pass'?'مطابقة':'غير مطابقة'}</span></div>
+      <div class="row"><div class="ttl mono">${esc(s.code)}</div><span class="badge ${s.status==='pass'?'badge-green':s.status==='fail'?'badge-red':'badge-yellow'}">${s.status==='pass'?'مطابقة':s.status==='fail'?'غير مطابقة':'انتظار'}</span></div>
     </a>`).join('') || '<div class="hint">لا توجد عينات</div>';
   layout(`<div class="page-title">${esc(f.name)}</div><div class="card"><div>المالك: ${esc(f.owner)}</div><div>الاستهلاك: ${f.monthly_water_m3} م³/شهر</div></div><div class="section-h">العينات</div>${sampleItems}`, 'المنشآت');
 });
@@ -664,7 +718,6 @@ route('/sample', (id) => {
   let result = DB.get('results',[]).find(r=>r.sample_id===id && !r.deleted);
   const limits = DB.get('lab_limits', {});
   const r = result || {};
-  const st = s.status==='pass'?'badge-green':s.status==='fail'?'badge-red':'badge-yellow';
 
   const params = [
     { key:'bod', label:'BOD', unit:'مجم/لتر', limit: limits.bod_max },
@@ -672,9 +725,9 @@ route('/sample', (id) => {
     { key:'tss', label:'TSS', unit:'مجم/لتر', limit: limits.tss_max },
     { key:'og', label:'O&G', unit:'مجم/لتر', limit: limits.og_max },
     { key:'ph', label:'pH', unit:'—', limit:`${limits.ph_min}-${limits.ph_max}` },
-    { key:'temperature', label:'درجة الحرارة', unit:'°م', limit:null },
-    { key:'settle_10', label:'المواد الراسبة 10د', unit:'مل/لتر', limit:null },
-    { key:'settle_15', label:'المواد الراسبة 15د', unit:'مل/لتر', limit:null }
+    { key:'temperature', label:'الحرارة', unit:'°م', limit:null },
+    { key:'settle_10', label:'راسبة 10د', unit:'مل/لتر', limit:null },
+    { key:'settle_15', label:'راسبة 15د', unit:'مل/لتر', limit:null }
   ];
 
   const resultFormHTML = `
@@ -683,7 +736,7 @@ route('/sample', (id) => {
       <form onsubmit="event.preventDefault(); saveResult('${s.id}')">
         ${params.map(p=>`
           <div class="res-row">
-            <div class="name">${p.label}<small>الحد: ${p.limit!==null?p.limit:'—'} ${p.unit}</small></div>
+            <div class="name">${p.label}<small>الحد: ${p.limit!==null?p.limit:'—'}</small></div>
             <input type="number" step="0.01" name="p_${p.key}" value="${r[p.key]??''}" placeholder="—">
           </div>
         `).join('')}
@@ -692,34 +745,9 @@ route('/sample', (id) => {
     </div>
   `;
 
-  const resultDisplay = result ? `
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-weight:700">النتائج الحالية</div>
-        <span class="badge ${st}">${s.status==='pass'?'مطابقة':'غير مطابقة'}</span>
-      </div>
-      <table style="width:100%;font-size:13px;border-collapse:collapse">
-        ${params.map(p=>{
-          const v = result[p.key];
-          let bad = false;
-          if(p.key==='ph') bad = v<limits.ph_min || v>limits.ph_max;
-          else if(p.limit!==null) bad = v > p.limit;
-          return `<tr style="border-bottom:1px dashed var(--border)"><td style="padding:6px 4px">${p.label}</td><td style="text-align:left;padding:6px 4px;font-weight:700;color:${bad?'var(--red)':'var(--text)'}">${v??'—'} ${p.unit}</td></tr>`;
-        }).join('')}
-      </table>
-    </div>
-  ` : '<div class="card text-muted" style="text-align:center">لا توجد نتائج بعد</div>';
-
   layout(`
-    <div class="page-title">العينة <span class="badge ${st}">${s.status==='pass'?'مطابقة':'غير مطابقة'}</span></div>
-    <div class="card">
-      <div class="mono" style="font-size:16px;font-weight:800;color:var(--primary);margin-bottom:8px">${esc(s.code)}</div>
-      <div style="font-size:13px;line-height:1.9">
-        <div><span class="text-muted">المنشأة:</span> ${esc(f?.name||'—')}</div>
-        <div><span class="text-muted">تاريخ الجمع:</span> ${fmtDate(s.collected_at)}</div>
-      </div>
-    </div>
-    ${resultDisplay}
+    <div class="page-title">العينة <span class="badge ${s.status==='pass'?'badge-green':s.status==='fail'?'badge-red':'badge-yellow'}">${s.status}</span></div>
+    <div class="card"><div class="mono" style="font-size:16px;font-weight:800">${esc(s.code)}</div><div>المنشأة: ${esc(f?.name)}</div></div>
     ${resultFormHTML}
   `, 'المنشآت');
 });
@@ -758,118 +786,20 @@ function saveResult(sampleId){
   if(sIdx>=0){ samples[sIdx].status = payload.auto_status; DB.set('samples', samples); }
 
   generateClaimsAndNotices(sampleId);
-
   toast(pass ? 'مطابقة — تم الحفظ' : 'غير مطابقة — تم توليد المطالبات', pass?'success':'error');
   router();
 }
 
-// ==================== CLAIMS & CALCULATIONS ====================
-
-function calcTreatmentBurden(sample, result, facility) {
-  if(!result) return null;
-  const limits = DB.get('lab_limits');
-  const settings = DB.get('settings');
-  const tiers = DB.get('charge_tiers');
-  const monthlyDisposed = (facility.monthly_water_m3 || 0) * ((settings.fees.disposal_ratio || 80) / 100);
-  
-  let lines = [];
-  let total = 0;
-  
-  function findTier(param, val) {
-    if(param === 'ph') {
-      if(val >= 6 && val <= 9.5) return null;
-      if(val >= 2 && val < 6) return tiers.find(t => t.param==='ph' && t.min===2 && t.max===6);
-      if(val > 9.5 && val <= 12) return tiers.find(t => t.param==='ph' && t.min===9.5 && t.max===12);
-      if(val < 2) return tiers.find(t => t.param==='ph' && t.min===0 && t.max===2);
-      if(val > 12) return tiers.find(t => t.param==='ph' && t.min===12 && t.max===14);
-      return null;
-    }
-    return tiers.find(t => t.param===param && val > t.min && val <= t.max);
-  }
-
-  const hasBodViolation = result.bod > limits.bod_max;
-  const hasCodViolation = result.cod > limits.cod_max;
-  const bothViolated = hasBodViolation && hasCodViolation;
-
-  const params = [
-    { key:'bod', val: result.bod, label:'BOD' },
-    { key:'tss', val: result.tss, label:'TSS' },
-    { key:'cod', val: result.cod, label:'COD' },
-    { key:'og', val: result.og, label:'O&G' },
-    { key:'ph', val: result.ph, label:'pH' }
-  ];
-
-  params.forEach(p => {
-    if(p.val == null) return;
-    const tier = findTier(p.key, p.val);
-    if(!tier) return;
-
-    let rate = tier.rate;
-    let months = tier.duration;
-    if(tier.unit === 'week') months = Math.max(1, Math.ceil(tier.duration / 4));
-
-    let lineTotal = monthlyDisposed * months * rate;
-    let discount = 0;
-    let note = '';
-
-    if(p.key === 'cod' && bothViolated) {
-      discount = lineTotal * 0.40;
-      lineTotal -= discount;
-      note = 'خصم 40% لاجتماع المخالفة مع BOD';
-    }
-
-    lines.push({ param: p.label, value: p.val, tierRate: rate, duration: tier.duration, durationUnit: tier.unit, months: months, total: lineTotal, discount, note });
-    total += lineTotal;
-  });
-
-  let vat = 0;
-  if(settings.fees.vat > 0) vat = total * (settings.fees.vat / 100);
-  
-  return { lines, subtotal: total, vat, total: total + vat, monthlyDisposed };
-}
-
-function generateClaimsAndNotices(sampleId) {
-  const sample = DB.get('samples',[]).find(s=>s.id===sampleId);
-  const result = DB.get('results',[]).find(r=>r.sample_id===sampleId && !r.deleted);
-  const facility = DB.get('facilities',[]).find(f=>f.id===sample.facility_id);
-  const settings = DB.get('settings');
-  if(!result || !sample || !facility) return;
-
-  const isPass = result.auto_status === 'pass';
-  const claims = DB.get('claims', []);
-  const notices = DB.get('compliance_notices', []);
-
-  const analysisClaimExists = claims.find(c => c.sample_id === sampleId && c.type === 'analysis_cost');
-  if(!analysisClaimExists) {
-    const cost = settings.fees.analysis_cost || 200;
-    const vat = cost * (settings.fees.vat / 100);
-    claims.push({ id: uid(), type: 'analysis_cost', serial: 'AC-' + (claims.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), base_amount: cost, vat_amount: vat, total: cost + vat, status: 'draft', lines: [{ label: 'تحليل عينة', qty: 1, rate: cost, total: cost }] });
-  }
-
-  if(!isPass) {
-    const calc = calcTreatmentBurden(sample, result, facility);
-    const burdenExists = claims.find(c => c.sample_id === sampleId && c.type === 'treatment_burden');
-    if(calc && calc.lines.length > 0 && !burdenExists) {
-      claims.push({ id: uid(), type: 'treatment_burden', serial: 'TB-' + (claims.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), base_amount: calc.subtotal, vat_amount: calc.vat, total: calc.total, status: 'draft', lines: calc.lines, monthlyDisposed: calc.monthlyDisposed });
-    }
-
-    const noticeExists = notices.find(n => n.sample_id === sampleId);
-    if(!noticeExists) {
-      notices.push({ id: uid(), serial: 'CN-' + (notices.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), status: 'draft', lines: calc.lines });
-    }
-  }
-
-  DB.set('claims', claims);
-  DB.set('compliance_notices', notices);
-}
-
+/* ============================================================
+   6. CLAIMS & NOTICES
+============================================================ */
 route('/claims', () => {
   const claims = DB.get('claims',[]);
   const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
   const items = claims.map(c=>`
     <a class="item" href="#/claim/${c.id}">
-      <div class="row"><div class="ttl">${typeLabel[c.type]}</div><span class="badge ${c.status==='draft'?'badge-yellow':'badge-green'}">${c.status==='draft'?'مسودة':'معتمد'}</span></div>
-      <div class="meta"><span class="mono">${esc(c.serial)}</span><span>💰 ${c.total} ج</span></div>
+      <div class="row"><div class="ttl">${typeLabel[c.type]}</div><span class="badge ${c.status==='draft'?'badge-yellow':c.status==='approved'?'badge-green':'badge-blue'}">${c.status}</span></div>
+      <div class="meta"><span class="mono">${esc(c.serial)}</span><span>💰 ${c.total.toFixed(2)} ج</span></div>
     </a>`).join('') || '<div class="empty"><p>لا توجد مطالبات</p></div>';
   layout(`<div class="page-title">المطالبات المالية</div>${items}`, 'المزيد');
 });
@@ -879,8 +809,7 @@ route('/claim', (id) => {
   if(!c) return;
   const f = DB.get('facilities',[]).find(x=>x.id===c.facility_id);
   const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
-  
-  const linesHTML = c.lines.map(l=>`<tr><td>${esc(l.label)}</td><td>${l.qty || 1}</td><td>${l.rate}</td><td>${l.total}</td></tr>`).join('');
+  const linesHTML = c.lines.map(l=>`<tr><td>${esc(l.label)}</td><td>${l.qty || 1}</td><td>${l.rate}</td><td>${l.total.toFixed(2)}</td></tr>`).join('');
 
   layout(`
     <div class="page-title no-print">تفاصيل المطالبة</div>
@@ -899,7 +828,7 @@ route('/claim', (id) => {
         <tbody>${linesHTML}</tbody>
       </table>
       <div style="text-align:left;font-weight:800;margin-bottom:10px">
-        <div>الإجمالي قبل الضريبة: ${c.base_amount} ج</div>
+        <div>الإجمالي قبل الضريبة: ${c.base_amount.toFixed(2)} ج</div>
         <div>الضريبة: ${c.vat_amount.toFixed(2)} ج</div>
         <div style="color:var(--primary);font-size:16px">الإجمالي: ${c.total.toFixed(2)} ج</div>
       </div>
@@ -923,6 +852,71 @@ function approveClaim(id) {
   if(idx>=0) { claims[idx].status = 'approved'; DB.set('claims', claims); router(); toast('تم الاعتماد', 'success'); }
 }
 
+route('/notices', () => {
+  const notices = DB.get('compliance_notices',[]);
+  const items = notices.map(n=>`
+    <a class="item" href="#/notice/${n.id}">
+      <div class="row"><div class="ttl">نموذج توفيق أوضاع</div><span class="badge badge-yellow">${n.status}</span></div>
+      <div class="meta"><span class="mono">${n.serial}</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد نماذج</p></div>';
+  layout(`<div class="page-title">نماذج توفيق الأوضاع</div>${items}`, 'المزيد');
+});
+
+route('/notice', (id) => {
+  const n = DB.get('compliance_notices',[]).find(x=>x.id===id);
+  if(!n) return;
+  const f = DB.get('facilities',[]).find(x=>x.id===n.facility_id);
+  const linesHTML = n.lines.map(l=>`<tr><td>${esc(l.param)}</td><td>${l.value}</td><td>${l.tierRate}</td><td>${l.duration} ${l.durationUnit}</td></tr>`).join('');
+
+  layout(`
+    <div class="page-title no-print">نموذج توفيق أوضاع</div>
+    <div class="card">
+      <div class="print-header" style="display:none;text-align:center;margin-bottom:20px">
+        <h2>إدارة الرقابة على الصرف الصناعي</h2>
+        <p>نموذج توفيق أوضاع - رقم: ${n.serial}</p>
+      </div>
+      <div style="margin-bottom:15px">
+        <div><b>المنشأة:</b> ${esc(f?.name)}</div>
+        <div><b>الكود:</b> ${esc(f?.code)}</div>
+        <div><b>التاريخ:</b> ${fmtDate(n.date)}</div>
+      </div>
+      <p style="font-weight:700;margin:15px 0">يجب سرعة توفيق أوضاع المنشأة خلال شهر من تاريخ استلام هذا النموذج.</p>
+      <table class="print-table" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:15px">
+        <thead><tr style="background:#f5f7fb"><th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th><th style="border:1px solid #ddd;padding:8px;text-align:right">القيمة</th><th style="border:1px solid #ddd;padding:8px;text-align:right">الفئة</th><th style="border:1px solid #ddd;padding:8px;text-align:right">المهلة</th></tr></thead>
+        <tbody>${linesHTML}</tbody>
+      </table>
+      <div class="print-footer" style="display:flex;justify-content:space-between;margin-top:30px;display:none">
+        <div style="text-align:center">اسم المستلم والتوقيع<br><br>______________</div>
+        <div style="text-align:center">ختم المنشأة<br><br>______________</div>
+      </div>
+    </div>
+    <div class="no-print" style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary btn-block" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+      ${n.status==='draft'?`<button class="btn btn-outline btn-block" onclick="deliverNotice('${n.id}')">✅ تم التسليم</button>`:''}
+    </div>
+  `, 'المزيد');
+  document.querySelectorAll('.print-header, .print-footer').forEach(el => el.style.display = 'flex');
+});
+
+function deliverNotice(id) {
+  const notices = DB.get('compliance_notices',[]);
+  const idx = notices.findIndex(x=>x.id===id);
+  if(idx>=0) { notices[idx].status = 'delivered'; DB.set('compliance_notices', notices); router(); toast('تم تسجيل التسليم', 'success'); }
+}
+
+/* ============================================================
+   7. MORE & SETTINGS
+============================================================ */
+route('/more', () => {
+  layout(`
+    <div class="page-title">المزيد</div>
+    <a class="item" href="#/licenses"><div class="ttl">📄 التراخيص</div></a>
+    <a class="item" href="#/notices"><div class="ttl">📋 نماذج توفيق الأوضاع</div></a>
+    <a class="item" href="#/collection"><div class="ttl">💵 التحصيل</div></a>
+    <button class="btn btn-danger btn-block" style="margin-top:30px" onclick="if(confirm('مسح كل البيانات؟')) { localStorage.clear(); location.reload(); }">🗑️ تصفير البيانات</button>
+  `, 'المزيد');
+});
+
 route('/licenses', () => {
   const licenses = DB.get('licenses',[]);
   const items = licenses.map(l=>`
@@ -936,23 +930,18 @@ route('/license', (id) => {
   layout(`<div class="page-title">${esc(l.facility_name)}</div><div class="card">${esc(l.request_no)}</div>`, 'المزيد');
 });
 
-route('/more', () => {
-  layout(`
-    <div class="page-title">المزيد</div>
-    <a class="item" href="#/licenses"><div class="ttl">📄 التراخيص وطلبات التوصيل</div></a>
-    <a class="item" href="#/claims"><div class="ttl">💰 المطالبات المالية</div></a>
-    <a class="item" href="#/samples"><div class="ttl">🧪 سجل العينات</div></a>
-    <button class="btn btn-danger btn-block" style="margin-top:30px" onclick="if(confirm('مسح كل البيانات؟')) { localStorage.clear(); location.reload(); }">🗑️ تصفير البيانات</button>
-  `, 'المزيد');
-});
-
-route('/samples', () => {
-  const samples = DB.get('samples',[]).filter(s=>!s.deleted);
-  const items = samples.map(s=>`
-    <a class="item" href="#/sample/${s.id}">
-      <div class="row"><div class="ttl mono">${esc(s.code)}</div><span class="badge ${s.status==='pass'?'badge-green':'badge-red'}">${s.status==='pass'?'مطابقة':'غير مطابقة'}</span></div>
-    </a>`).join('');
-  layout(`<div class="page-title">سجل العينات</div>${items}`, 'المزيد');
+route('/collection', () => {
+  const claims = DB.get('claims',[]).filter(c=>c.status==='approved');
+  const payments = DB.get('payments',[]);
+  const items = claims.map(c=>{
+    const paid = payments.filter(p=>p.claim_id===c.id).reduce((s,p)=>s+p.amount,0);
+    const rem = c.total - paid;
+    return `<div class="item">
+      <div class="row"><div class="ttl">${esc(c.serial)}</div><span class="badge ${rem<=0?'badge-green':'badge-yellow'}">${rem<=0?'مسددة':'متبقي '+rem.toFixed(2)}</span></div>
+      <div class="meta"><span>💰 ${c.total.toFixed(2)} ج</span></div>
+    </div>`;
+  }).join('') || '<div class="empty"><p>لا توجد مطالبات معتمدة</p></div>';
+  layout(`<div class="page-title">التحصيل</div>${items}`, 'المزيد');
 });
 
 </script>
