@@ -147,9 +147,6 @@ hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
 <div id="modal" class="modal-bg"><div class="modal" id="modalContent"></div></div>
 
 <script>
-/* ============================================================
-   1. DATABASE & STORAGE
-============================================================ */
 const DB = {
   get(k, def){ try{ const v = localStorage.getItem('app_'+k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
   set(k, v){ try { localStorage.setItem('app_'+k, JSON.stringify(v)); } catch(e) {} },
@@ -167,9 +164,6 @@ function toast(msg, type=''){ const t = $('#toast'); t.textContent = msg; t.clas
 function openModal(html){ $('#modalContent').innerHTML = html; $('#modal').classList.add('show'); }
 function closeModal(){ $('#modal').classList.remove('show'); }
 
-/* ============================================================
-   2. UTILITIES (Arabic Numbers, Calculations)
-============================================================ */
 function numToArabicWords(n){
   n = Math.round(n * 100) / 100;
   const intPart = Math.floor(n);
@@ -215,7 +209,6 @@ function calcTreatmentBurden(sample, result, facility) {
       if(val > 12) return tiers.find(t => t.param==='ph' && t.min===12 && t.max===14);
       return null;
     }
-    // val > min && val <= max (القيمة التي تساوي الحد الأعلى تقع في الشريحة الأدنى)
     return tiers.find(t => t.param===param && val > t.min && val <= t.max);
   }
 
@@ -238,20 +231,14 @@ function calcTreatmentBurden(sample, result, facility) {
 
     let rate = tier.rate;
     let months = tier.duration;
-    // تحويل الأسابيع إلى شهور (أي مهلة أقل من شهر تحسب شهراً واحداً)
     if(tier.unit === 'week') months = Math.max(1, Math.ceil(tier.duration / 4));
-    
     let lineTotal = monthlyDisposed * months * rate;
     let discount = 0;
-    let note = '';
-
     if(p.key === 'cod' && bothViolated) {
-      discount = lineTotal * 0.40; // خصم 40% لـ COD
+      discount = lineTotal * 0.40;
       lineTotal -= discount;
-      note = 'خصم 40% لاجتماع المخالفة مع BOD';
     }
-
-    lines.push({ param: p.label, value: p.val, tierRate: rate, duration: tier.duration, durationUnit: tier.unit, months: months, total: lineTotal, discount, note });
+    lines.push({ param: p.label, value: p.val, tierRate: rate, duration: tier.duration, durationUnit: tier.unit, months: months, total: lineTotal, discount });
     total += lineTotal;
   });
 
@@ -271,7 +258,6 @@ function generateClaimsAndNotices(sampleId) {
   const claims = DB.get('claims', []);
   const notices = DB.get('compliance_notices', []);
 
-  // 1. مطالبـة تكلفة التحليل
   if(isPass || settings.fees.issue_analysis_for_fail) {
     const analysisClaimExists = claims.find(c => c.sample_id === sampleId && c.type === 'analysis_cost');
     if(!analysisClaimExists) {
@@ -281,14 +267,12 @@ function generateClaimsAndNotices(sampleId) {
     }
   }
 
-  // 2. مطالبة أعباء التنقية
   const calc = calcTreatmentBurden(sample, result, facility);
   const burdenExists = claims.find(c => c.sample_id === sampleId && c.type === 'treatment_burden');
   if(calc && calc.lines.length > 0 && !burdenExists) {
     claims.push({ id: uid(), type: 'treatment_burden', serial: 'TB-' + (claims.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), base_amount: calc.subtotal, vat_amount: calc.vat, total: calc.total, status: 'draft', lines: calc.lines, monthlyDisposed: calc.monthlyDisposed });
   }
 
-  // 3. نموذج توفيق الأوضاع
   if(!isPass && !notices.find(n => n.sample_id === sampleId)) {
     notices.push({ id: uid(), serial: 'CN-' + (notices.length+1), sample_id: sampleId, facility_id: facility.id, date: today(), status: 'draft', lines: calc.lines });
   }
@@ -297,9 +281,6 @@ function generateClaimsAndNotices(sampleId) {
   DB.set('compliance_notices', notices);
 }
 
-/* ============================================================
-   3. SEED DATA (Matches Requirements)
-============================================================ */
 const BRANCH_NAMES = ['بنها','مركز بنها','طوخ','كفر شكر','قها','قليوب','شبين القناطر','القناطر الخيرية','الخصوص','غرب شبرا','شمال الخانكة','جنوب الخانكة'];
 const DEFAULT_TIERS = [
   { param:'bod', min:244, max:600, type:'plant', rate:1, duration:6, unit:'month' },
@@ -324,7 +305,7 @@ const DEFAULT_TIERS = [
 function seedIfEmpty(){
   if(DB.get('seeded')) return;
   DB.set('branches', BRANCH_NAMES.map((name,i)=>({ id: 'b'+(i+1), name, code: i+1, groundwater_billing_enabled: i<6, active: true })));
-  DB.set('labs', [{ id:'lab1', name:'معمل بنها المركزي' }, { id:'lab2', name:'معمل القليوبية' }, { id:'lab3', name:'معمل شبين' }]);
+  DB.set('labs', [{ id:'lab1', name:'معمل بنها المركزي' }, { id:'lab2', name:'معمل القليوبية' }]);
   DB.set('users', [
     { id:'u1', name:'م. أحمد المدير العام', username:'admin', password:'1234', role:'gm', active:true },
     { id:'u2', name:'م. سارة مدير الرقابة', username:'supervisor', password:'1234', role:'control_mgr', active:true },
@@ -337,7 +318,6 @@ function seedIfEmpty(){
   DB.set('settings', { fees: { inspection_commercial: 100, inspection_industrial: 300, vat: 14, groundwater_rate: 6, analysis_cost: 200, disposal_ratio: 80, issue_analysis_for_fail: false } });
   DB.set('charge_tiers', DEFAULT_TIERS);
   
-  // Facilities matching Test Cases (1000 m3 water)
   const facilities = [
     { id:'f1', name:'مصنع النور للغزل والنسيج', owner:'حسن محمد', address:'شارع الجمهورية، بنها', branch_id:'b1', code:'1/1', classification:'industrial', activity:'غزل ونسيج', monthly_water_m3:1000, work_days:26, workers:20, shifts:2, weekly_off:'الجمعة', responsible_name:'محمد', responsible_phone:'010', water_source_type:'gov', gov_account:'88451200', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
     { id:'f2', name:'محطة وقود التعاون', owner:'سامي إبراهيم', address:'ميدان المحطة، بنها', branch_id:'b1', code:'2/1', classification:'commercial', activity:'محطة وقود', monthly_water_m3:1000, work_days:30, workers:5, shifts:1, weekly_off:'', responsible_name:'سامي', responsible_phone:'011', water_source_type:'gov', gov_account:'88451201', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
@@ -345,7 +325,6 @@ function seedIfEmpty(){
   ];
   DB.set('facilities', facilities);
   
-  // Pre-loaded samples for testing
   DB.set('inspections', [
     { id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
     { id:'i2', facility_id:'f2', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false },
@@ -359,19 +338,14 @@ function seedIfEmpty(){
   
   DB.set('plan_items', [{ id:'p1', date:today(), facility_id:'f1', branch_id:'b1', inspector_id:'u6', status:'scheduled', priority:'high', reason:'متابعة' }]);
   DB.set('licenses', [{ id:'l1', request_no:'LIC-001', date:today(), facility_name:'مصنع الأمل', owner:'أحمد علي', branch_id:'b1', status:'new', docs:{} }]);
-  DB.set('license_required_docs', ['سجل تجاري', 'بطاقة ضريبية', 'عقد ملكية']);
   
   DB.set('claims', []);
   DB.set('payments', []);
   DB.set('compliance_notices', []);
   DB.set('facility_code_counters', { b1: 2, b6: 1 });
-  DB.set('audit', []);
   DB.set('seeded', true);
 }
 
-/* ============================================================
-   4. AUTH & ROUTER
-============================================================ */
 const Session = { user: null };
 function login(username, password){
   const u = DB.get('users', []).find(x => x.username === username && x.password === password && x.active);
@@ -430,12 +404,6 @@ function layout(content, active){
     </nav>
   `;
 }
-</script>
-</body>
-</html>
-/* ============================================================
-   5. VIEWS & ROUTES
-============================================================ */
 
 route('/login', () => {
   $('#app').innerHTML = `
@@ -569,7 +537,6 @@ function renderInspectionForm(inspId){
   const content = `
     <div class="page-title">${existing?'تعديل معاينة':'معاينة جديدة'}</div>
     <form id="inspForm" onsubmit="event.preventDefault(); saveInspection('${existing?.id||''}')">
-      
       <div class="section-h">أ. بيانات المعاينة</div>
       <div class="card">
         <div class="field"><label>سبب المعاينة</label>
@@ -586,7 +553,6 @@ function renderInspectionForm(inspId){
           </div>
         </div>
       </div>
-
       <div class="section-h">ب. بيانات المنشأة</div>
       <div class="card">
         <div class="field"><label>اسم المنشأة <span class="req">*</span></label><input name="name" value="${esc(f.name||'')}" required></div>
@@ -619,7 +585,6 @@ function renderInspectionForm(inspId){
         </div>
         <div class="field"><label>متوسط استهلاك المياه الشهري (م³) <span class="req">*</span></label><input type="number" name="monthly_water_m3" value="${f.monthly_water_m3||''}" min="0" required></div>
       </div>
-
       <div class="section-h">ج. مصادر المياه</div>
       <div class="card">
         <div class="field"><label>نوع المصدر</label>
@@ -640,7 +605,6 @@ function renderInspectionForm(inspId){
           <div id="pumpsContainer">${(f.pumps||[]).map((p,i)=>pumpRow(p,i)).join('')}</div>
         </div>
       </div>
-
       <div class="section-h">د. الصرف</div>
       <div class="card">
         <div class="field"><label>نوعية الصرف</label>
@@ -658,18 +622,15 @@ function renderInspectionForm(inspId){
           </select>
         </div>
       </div>
-
       <div class="section-h">هـ. العينات</div>
       <div class="card">
         <button type="button" class="btn btn-outline btn-sm" onclick="addSample()" style="margin-bottom:10px">+ إضافة عينة</button>
         <div id="samplesContainer"></div>
       </div>
-
       <div class="section-h">و. النهاية</div>
       <div class="card">
         <div class="field"><label>ملاحظات المعاين</label><textarea name="notes">${esc(data.notes||'')}</textarea></div>
       </div>
-
       <div style="margin-top:16px;margin-bottom:20px"><button type="submit" class="btn btn-primary btn-block btn-lg">اعتماد وحفظ</button></div>
     </form>
   `;
@@ -883,19 +844,15 @@ function saveResult(sampleId){
   toast(pass ? 'مطابقة — تم الحفظ' : 'غير مطابقة — تم توليد المطالبات', pass?'success':'error');
   router();
 }
-/* ============================================================
-   6. CLAIMS, NOTICES & COLLECTION
-============================================================ */
+
 route('/claims', () => {
   const claims = DB.get('claims',[]);
   const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
-  
   const items = claims.map(c=>`
     <a class="item" href="#/claim/${c.id}">
-      <div class="row"><div class="ttl">${typeLabel[c.type] || c.type}</div><span class="badge ${c.status==='draft'?'badge-yellow':c.status==='approved'?'badge-green':'badge-blue'}">${c.status==='draft'?'مسودة':c.status==='approved'?'معتمد':'جاهز'}</span></div>
+      <div class="row"><div class="ttl">${typeLabel[c.type]}</div><span class="badge ${c.status==='draft'?'badge-yellow':c.status==='approved'?'badge-green':'badge-blue'}">${c.status}</span></div>
       <div class="meta"><span class="mono">${esc(c.serial)}</span><span>💰 ${c.total.toFixed(2)} ج</span></div>
     </a>`).join('') || '<div class="empty"><p>لا توجد مطالبات</p></div>';
-    
   layout(`<div class="page-title">المطالبات المالية</div>${items}`, 'المزيد');
 });
 
@@ -904,15 +861,7 @@ route('/claim', (id) => {
   if(!c) return;
   const f = DB.get('facilities',[]).find(x=>x.id===c.facility_id);
   const typeLabel = { inspection:'رسوم معاينة', groundwater:'مياه جوفية', analysis_cost:'تكلفة تحليل', treatment_burden:'أعباء تنقية' };
-  
-  const linesHTML = c.lines.map(l=>`
-    <tr>
-      <td>${esc(l.label || l.param)}</td>
-      <td>${l.qty || l.months || 1}</td>
-      <td>${l.rate || l.tierRate || '—'}</td>
-      <td>${l.total.toFixed(2)}</td>
-    </tr>
-  `).join('');
+  const linesHTML = c.lines.map(l=>`<tr><td>${esc(l.label || l.param)}</td><td>${l.qty || l.months || 1}</td><td>${l.rate || l.tierRate || '—'}</td><td>${l.total.toFixed(2)}</td></tr>`).join('');
 
   layout(`
     <div class="page-title no-print">تفاصيل المطالبة</div>
@@ -927,14 +876,7 @@ route('/claim', (id) => {
         <div><b>التاريخ:</b> ${fmtDate(c.date)}</div>
       </div>
       <table class="print-table" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:15px">
-        <thead>
-          <tr style="background:#f5f7fb">
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">الكمية/المهلة</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">الفئة</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">الإجمالي</th>
-          </tr>
-        </thead>
+        <thead><tr style="background:#f5f7fb"><th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th><th style="border:1px solid #ddd;padding:8px;text-align:right">الكمية</th><th style="border:1px solid #ddd;padding:8px;text-align:right">الفئة</th><th style="border:1px solid #ddd;padding:8px;text-align:right">الإجمالي</th></tr></thead>
         <tbody>${linesHTML}</tbody>
       </table>
       <div style="text-align:left;font-weight:800;margin-bottom:10px">
@@ -942,9 +884,7 @@ route('/claim', (id) => {
         <div>الضريبة: ${c.vat_amount.toFixed(2)} ج</div>
         <div style="color:var(--primary);font-size:16px">الإجمالي: ${c.total.toFixed(2)} ج</div>
       </div>
-      <div style="background:#f9f9f9;padding:10px;border-radius:8px;font-size:13px;margin-bottom:15px">
-        <b>فقط: </b> ${numToArabicWords(c.total)}
-      </div>
+      <div style="background:#f9f9f9;padding:10px;border-radius:8px;font-size:13px;margin-bottom:15px"><b>فقط: </b> ${numToArabicWords(c.total)}</div>
       <div class="print-footer" style="display:flex;justify-content:space-between;margin-top:30px;display:none">
         <div style="text-align:center">توقيع المراجع<br><br>______________</div>
         <div style="text-align:center">اعتماد المدير العام<br><br>______________</div>
@@ -955,8 +895,6 @@ route('/claim', (id) => {
       ${c.status==='draft'?`<button class="btn btn-outline btn-block" onclick="approveClaim('${c.id}')">✅ اعتماد</button>`:''}
     </div>
   `, 'المزيد');
-  
-  // تفعيل عرض عناصر الطباعة
   document.querySelectorAll('.print-header, .print-footer').forEach(el => el.style.display = 'flex');
 });
 
@@ -980,14 +918,7 @@ route('/notice', (id) => {
   const n = DB.get('compliance_notices',[]).find(x=>x.id===id);
   if(!n) return;
   const f = DB.get('facilities',[]).find(x=>x.id===n.facility_id);
-  const linesHTML = n.lines.map(l=>`
-    <tr>
-      <td>${esc(l.param)}</td>
-      <td>${l.value}</td>
-      <td>${l.tierRate}</td>
-      <td>${l.duration} ${l.durationUnit==='month'?'شهور':'أسابيع'}</td>
-    </tr>
-  `).join('');
+  const linesHTML = n.lines.map(l=>`<tr><td>${esc(l.param)}</td><td>${l.value}</td><td>${l.tierRate}</td><td>${l.duration} ${l.durationUnit==='month'?'شهور':'أسابيع'}</td></tr>`).join('');
 
   layout(`
     <div class="page-title no-print">نموذج توفيق أوضاع</div>
@@ -1003,14 +934,7 @@ route('/notice', (id) => {
       </div>
       <p style="font-weight:700;margin:15px 0">يجب سرعة توفيق أوضاع المنشأة خلال شهر من تاريخ استلام هذا النموذج.</p>
       <table class="print-table" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:15px">
-        <thead>
-          <tr style="background:#f5f7fb">
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">القيمة المقاسة</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">الحد الأقصى</th>
-            <th style="border:1px solid #ddd;padding:8px;text-align:right">المهلة</th>
-          </tr>
-        </thead>
+        <thead><tr style="background:#f5f7fb"><th style="border:1px solid #ddd;padding:8px;text-align:right">البند</th><th style="border:1px solid #ddd;padding:8px;text-align:right">القيمة المقاسة</th><th style="border:1px solid #ddd;padding:8px;text-align:right">الحد الأقصى</th><th style="border:1px solid #ddd;padding:8px;text-align:right">المهلة</th></tr></thead>
         <tbody>${linesHTML}</tbody>
       </table>
       <div class="print-footer" style="display:flex;justify-content:space-between;margin-top:30px;display:none">
@@ -1035,7 +959,6 @@ function deliverNotice(id) {
 route('/collection', () => {
   const claims = DB.get('claims',[]).filter(c=>c.status==='approved');
   const payments = DB.get('payments',[]);
-  
   const items = claims.map(c=>{
     const paid = payments.filter(p=>p.claim_id===c.id).reduce((s,p)=>s+p.amount,0);
     const rem = c.total - paid;
@@ -1045,7 +968,6 @@ route('/collection', () => {
       ${rem>0 ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="openPaymentModal('${c.id}', ${rem})">تسجيل دفعة</button>` : ''}
     </div>`;
   }).join('') || '<div class="empty"><p>لا توجد مطالبات معتمدة</p></div>';
-  
   layout(`<div class="page-title">التحصيل</div>${items}`, 'المزيد');
 });
 
@@ -1055,11 +977,7 @@ function openPaymentModal(claimId, maxAmount) {
     <form onsubmit="event.preventDefault(); savePayment('${claimId}', this)">
       <div class="field"><label>المبلغ المحصل (ج)</label><input type="number" name="amount" value="${maxAmount}" max="${maxAmount}" min="0.01" step="0.01" required></div>
       <div class="field"><label>طريقة الدفع</label>
-        <select name="method">
-          <option value="cash">نقدي</option>
-          <option value="check">شيك</option>
-          <option value="transfer">تحويل بنكي</option>
-        </select>
+        <select name="method"><option value="cash">نقدي</option><option value="check">شيك</option><option value="transfer">تحويل بنكي</option></select>
       </div>
       <div class="field"><label>رقم الإيصال / الشيك</label><input name="ref" required></div>
       <button class="btn btn-primary btn-block btn-lg" style="margin-top:16px">حفظ الدفعة</button>
@@ -1069,19 +987,13 @@ function openPaymentModal(claimId, maxAmount) {
 
 function savePayment(claimId, form) {
   const payments = DB.get('payments',[]);
-  payments.push({
-    id: uid(), claim_id: claimId, amount: parseFloat(form.amount.value),
-    method: form.method.value, ref: form.ref.value, date: nowISO()
-  });
+  payments.push({ id: uid(), claim_id: claimId, amount: parseFloat(form.amount.value), method: form.method.value, ref: form.ref.value, date: nowISO() });
   DB.set('payments', payments);
   closeModal();
   toast('تم تسجيل الدفعة بنجاح', 'success');
   router();
 }
 
-/* ============================================================
-   7. MORE MENU & MISC
-============================================================ */
 route('/more', () => {
   layout(`
     <div class="page-title">المزيد</div>
@@ -1101,7 +1013,6 @@ route('/more', () => {
   `, 'المزيد');
 });
 
-// شاشة التراخيص (مبسطة لتجنب الخطأ 404)
 route('/licenses', () => {
   const licenses = DB.get('licenses',[]);
   const items = licenses.map(l=>`
@@ -1123,3 +1034,6 @@ route('/license', (id) => {
     </div>
   `, 'المزيد');
 });
+</script>
+</body>
+</html>
