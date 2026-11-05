@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d2d5a">
+<title>الرقابة على الصرف الصناعي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#0d2d5a; --primary-l:#1a4a8a; --primary-xl:#e6edf7;
+  --bg:#f5f7fb; --card:#fff; --border:#dbe3ee;
+  --text:#0e1b2e; --muted:#64748b;
+  --green:#15803d; --green-bg:#dcfce7;
+  --red:#b91c1c; --red-bg:#fee2e2;
+  --yellow:#a16207; --yellow-bg:#fef3c7;
+  --blue:#1d4ed8; --blue-bg:#dbeafe;
+  --shadow:0 2px 8px rgba(13,45,90,.08);
+  --shadow-lg:0 8px 24px rgba(13,45,90,.15);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;font-family:'Cairo',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+body{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+input,select,textarea,button{font-family:inherit;font-size:15px}
+button{cursor:pointer;border:none;font-weight:600}
+input,select,textarea{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;background:#fff;color:var(--text);-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary-l);box-shadow:0 0 0 3px rgba(26,74,138,.12)}
+textarea{resize:vertical;min-height:70px}
+label{display:block;font-weight:600;font-size:13.5px;margin-bottom:6px;color:var(--text)}
+label .req{color:var(--red);margin-right:2px}
+.field{margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:380px){.grid2{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 18px;border-radius:12px;font-size:15px;font-weight:700;transition:transform .08s,background .15s;min-height:48px;user-select:none}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-l)}
+.btn-outline{background:#fff;color:var(--primary);border:1.5px solid var(--primary)}
+.btn-ghost{background:transparent;color:var(--primary)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-block{display:flex;width:100%}
+.btn-sm{padding:8px 12px;font-size:13px;min-height:38px;border-radius:10px}
+.btn-lg{min-height:56px;font-size:16px}
+.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.6}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-gray{background:#eef2f7;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+
+.topbar{position:sticky;top:0;z-index:50;background:var(--primary);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow)}
+.topbar h1{font-size:15px;margin:0;font-weight:700;flex:1;line-height:1.3}
+.topbar .avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0}
+.topbar button{background:transparent;color:#fff;padding:8px;border-radius:10px;font-size:13px}
+
+.bottomnav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:50;box-shadow:0 -2px 12px rgba(13,45,90,.06)}
+.bottomnav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 4px;color:var(--muted);text-decoration:none;font-size:11px;font-weight:600;min-height:60px}
+.bottomnav a.active{color:var(--primary)}
+.bottomnav a svg{width:22px;height:22px}
+
+.page{padding:14px;max-width:720px;margin:0 auto}
+.page-title{font-size:20px;font-weight:800;margin:6px 0 14px;color:var(--primary);display:flex;align-items:center;gap:10px}
+.page-title .sub{font-size:13px;color:var(--muted);font-weight:500;margin-right:auto}
+
+.item{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow);border-right:4px solid var(--primary-l);display:block;text-decoration:none;color:inherit;transition:transform .08s}
+.item:active{transform:scale(.985)}
+.item .row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.item .ttl{font-weight:700;font-size:15px;flex:1;color:var(--primary)}
+.item .meta{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:6px}
+
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+.stat{background:#fff;border-radius:14px;padding:14px;box-shadow:var(--shadow);text-align:center}
+.stat .num{font-size:26px;font-weight:800;color:var(--primary);line-height:1.1}
+.stat .lbl{font-size:12px;color:var(--muted);margin-top:4px;font-weight:600}
+.stat.warn .num{color:var(--red)}
+
+.section-h{display:flex;align-items:center;gap:10px;margin:20px 0 12px;font-weight:800;font-size:16px;color:var(--primary)}
+.section-h::before{content:'';width:4px;height:20px;background:var(--primary);border-radius:2px}
+
+.toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(120px);background:#1a2436;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;transition:transform .3s;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--red)}
+
+.modal-bg{position:fixed;inset:0;background:rgba(13,45,90,.6);display:none;align-items:flex-end;justify-content:center;z-index:300;backdrop-filter:blur(2px)}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:20px;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.modal-h h3{margin:0;font-size:17px;color:var(--primary)}
+.modal-h button{background:transparent;color:var(--muted);font-size:22px;padding:4px 8px;line-height:1}
+
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(160deg,var(--primary),#081e3f)}
+.login-box{background:#fff;border-radius:22px;padding:26px 22px;width:100%;max-width:420px;box-shadow:var(--shadow-lg)}
+.login-box .logo{width:64px;height:64px;border-radius:18px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:26px;font-weight:800;margin:0 auto 14px}
+.login-box h2{text-align:center;font-size:20px;color:var(--primary);margin:0 0 4px}
+.login-box p{text-align:center;color:var(--muted);font-size:13px;margin:0 0 20px}
+.demo-users{background:var(--primary-xl);border-radius:12px;padding:12px;font-size:12px;margin-top:16px;color:var(--primary);line-height:1.8}
+.demo-users b{display:block;margin-bottom:4px;font-size:13px}
+.demo-users code{background:#fff;padding:2px 6px;border-radius:6px;font-family:ui-monospace,monospace;font-size:11.5px}
+
+.sample-card{background:var(--primary-xl);border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;position:relative}
+.sample-card .sample-code{font-family:ui-monospace,monospace;background:#fff;padding:4px 10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--primary);display:inline-block;margin-bottom:10px}
+.sample-card .rm{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;width:28px;height:28px;border-radius:8px;font-size:16px;padding:0}
+
+.res-row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border)}
+.res-row .name{font-size:13.5px;font-weight:600}
+.res-row .name small{display:block;color:var(--muted);font-weight:500;font-size:11.5px;margin-top:2px}
+.res-row input{padding:10px 12px;text-align:center;font-weight:700;font-size:15px}
+.res-row input.bad{border-color:var(--red);background:var(--red-bg);color:var(--red)}
+.res-row input.good{border-color:var(--green)}
+
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty p{margin:0;font-size:14px}
+hr.sep{border:none;border-top:1px dashed var(--border);margin:16px 0}
+.mono{font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px}
+.text-muted{color:var(--muted)}
+.text-red{color:var(--red)}
+.text-green{color:var(--green)}
+.tiny{font-size:11.5px}
+
+.plan-day{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.plan-day-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:12px}
+.plan-day-header h4{margin:0;font-size:15px;color:var(--primary);font-weight:800}
+.plan-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border)}
+.plan-item .p-info{flex:1}
+.plan-item .p-title{font-weight:700;font-size:14px;margin-bottom:4px}
+.plan-item .p-meta{font-size:12px;color:var(--muted);display:flex;gap:10px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+<div id="modal" class="modal-bg"><div class="modal" id="modalContent"></div></div>
+
+<script>
+const DB = {
+  get(k, def){ try{ const v = localStorage.getItem('app_'+k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
+  set(k, v){ localStorage.setItem('app_'+k, JSON.stringify(v)); },
+  del(k){ localStorage.removeItem('app_'+k); }
+};
+
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const today = () => new Date().toISOString().slice(0,10);
+const nowISO = () => new Date().toISOString();
+const fmtDate = d => d ? new Date(d).toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'}) : '—';
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg, type=''){ const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + type; clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2600); }
+function openModal(html){ $('#modalContent').innerHTML = html; $('#modal').classList.add('show'); }
+function closeModal(){ $('#modal').classList.remove('show'); }
+
+const BRANCH_NAMES = ['بنها','مركز بنها','طوخ','كفر شكر','قها','قليوب','شبين القناطر','القناطر الخيرية','الخصوص','غرب شبرا','شمال الخانكة','جنوب الخانكة'];
+
+function seedIfEmpty(){
+  if(DB.get('seeded')) return;
+  const branches = BRANCH_NAMES.map((name,i)=>({ id: 'b'+(i+1), name, code: i+1, groundwater_billing_enabled: i<6, active: true }));
+  DB.set('branches', branches);
+  DB.set('labs', [{ id:'lab1', name:'معمل بنها المركزي', active:true }, { id:'lab2', name:'معمل القليوبية', active:true }]);
+  
+  const users = [
+    { id:'u1', name:'م. أحمد المدير العام', username:'admin', password:'1234', role:'gm', branch_id:null, active:true },
+    { id:'u2', name:'م. سارة مدير الرقابة', username:'supervisor', password:'1234', role:'control_mgr', branch_id:null, active:true },
+    { id:'u3', name:'م. خالد مدير التحكم', username:'claims', password:'1234', role:'control_claims', branch_id:null, active:true },
+    { id:'u5', name:'م. طارق مدير التراخيص', username:'licensing', password:'1234', role:'licensing_mgr', branch_id:null, active:true },
+    { id:'u6', name:'ك. هدى كيميائية', username:'chemist', password:'1234', role:'field', job_title:'chemist', branch_id:'b1', active:true }
+  ];
+  DB.set('users', users);
+  DB.set('lab_limits', { bod_max: 600, tss_max: 800, cod_max: 1100, og_max: 100, ph_min: 6, ph_max: 9.5 });
+  
+  // Seed Facilities
+  const facilities = [
+    { id:'f1', name:'مصنع النور للغزل والنسيج', owner:'حسن محمد', address:'شارع الجمهورية، بنها', branch_id:'b1', code:'1/1', classification:'industrial', activity:'غزل ونسيج', monthly_water_m3:1200, water_source_type:'gov', gov_account:'88451200', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false },
+    { id:'f2', name:'محطة وقود التعاون', owner:'سامي إبراهيم', address:'ميدان المحطة، بنها', branch_id:'b1', code:'2/1', classification:'commercial', activity:'محطة وقود', monthly_water_m3:300, water_source_type:'gov', gov_account:'88451201', disposal_type:'industrial', disposal_destination:'network', registered_at:nowISO(), deleted:false }
+  ];
+  DB.set('facilities', facilities);
+  
+  // Seed Inspections & Samples
+  DB.set('inspections', [{ id:'i1', facility_id:'f1', branch_id:'b1', reason:'plan', inspection_date:today(), inspector_id:'u6', status:'approved', deleted:false }]);
+  DB.set('samples', [{ id:'s1', code:'1-260112-X7K2', facility_id:'f1', inspection_id:'i1', type:'simple', outlet:'المخرج الرئيسي', lab_id:'lab1', collected_at:nowISO(), status:'pass', deleted:false }]);
+  DB.set('results', [{ id:'r1', sample_id:'s1', bod:300, cod:800, tss:400, og:50, ph:7.2, temperature:28, settle_10:1, settle_15:2, entered_by:'u6', entered_at:nowISO(), auto_status:'pass', deleted:false }]);
+  
+  // Seed Plans & Licenses
+  DB.set('plan_items', [{ id:'p1', date:today(), facility_id:'f1', branch_id:'b1', inspector_id:'u6', status:'scheduled', priority:'high', reason:'متابعة' }]);
+  DB.set('licenses', [{ id:'l1', request_no:'LIC-001', date:today(), facility_name:'مصنع الأمل', owner:'أحمد علي', branch_id:'b1', status:'new', docs:{} }]);
+  DB.set('license_required_docs', ['سجل تجاري', 'بطاقة ضريبية', 'عقد ملكية']);
+  
+  DB.set('facility_code_counters', { b1: 2 });
+  DB.set('audit', []);
+  DB.set('seeded', true);
+}
+
+const Session = { user: null };
+function login(username, password){
+  const u = DB.get('users', []).find(x => x.username === username && x.password === password && x.active);
+  if(!u){ toast('بيانات الدخول غير صحيحة', 'error'); return false; }
+  Session.user = u; DB.set('session', u); location.hash = '#/home'; return true;
+}
+function logout(){ Session.user = null; DB.del('session'); location.hash = '#/login'; }
+function branchName(id){ return DB.get('branches',[]).find(b=>b.id===id)?.name || '—'; }
+function roleLabel(r){ return { gm:'المدير العام', control_mgr:'مدير الرقابة', control_claims:'مدير التحكم', licensing_mgr:'مدير التراخيص', field:'فريق المعاينات' }[r] || r; }
+function reasonLabel(r){ return {license:'طلب توصيل', plan:'خطة الإدارة', survey:'مسح'}[r]||r; }
+function sampleStatusLabel(s){ return {pending:'في الانتظار', pass:'مطابقة', fail:'غير مطابقة'}[s]||s; }
+
+const routes = {};
+function route(path, render){ routes[path] = render; }
+
+function router(){
+  const hash = location.hash || '#/login';
+  const pathString = hash.slice(1); 
+  
+  if(!Session.user && pathString !== 'login'){ location.hash = '#/login'; return; }
+  if(Session.user && pathString === 'login'){ location.hash = '#/home'; return; }
+
+  // Check exact match first (e.g., /inspection/new)
+  if (routes['/' + pathString]) {
+    routes['/' + pathString]();
+    return;
+  }
+
+  // Check base path with params (e.g., /inspection/123)
+  const parts = pathString.split('/').filter(Boolean);
+  const path = '/' + parts[0];
+  const fn = routes[path];
+  
+  if(fn){ 
+    fn(...parts.slice(1)); 
+  } else { 
+    layout(`<div class="empty"><p>الصفحة غير موجودة</p></div>`, ''); 
+  }
+}
+
+window.addEventListener('hashchange', router);
+window.addEventListener('DOMContentLoaded', () => {
+  seedIfEmpty();
+  const saved = DB.get('session', null);
+  if(saved){ const u = DB.get('users',[]).find(x=>x.id===saved.id); if(u && u.active){ Session.user = u; location.hash = '#/home'; } }
+  router();
+});
+
+function layout(content, active){
+  const u = Session.user;
+  const navItems = [
+    { href:'#/home', label:'الرئيسية', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>' },
+    { href:'#/plans', label:'الخطة', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>' },
+    { href:'#/inspections', label:'المعاينات', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>' },
+    { href:'#/facilities', label:'المنشآت', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>' },
+    { href:'#/more', label:'المزيد', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>' }
+  ];
+  $('#app').innerHTML = `
+    <div class="topbar">
+      <div class="avatar">${esc(u.name.charAt(0))}</div>
+      <h1>${esc(u.name)}<div style="font-size:11.5px;font-weight:500;opacity:.85">${roleLabel(u.role)}</div></h1>
+      <button onclick="logout()">خروج</button>
+    </div>
+    <div class="page">${content}</div>
+    <nav class="bottomnav">
+      ${navItems.map(n=>`<a href="${n.href}" class="${active===n.label?'active':''}">${n.icon}<span>${n.label}</span></a>`).join('')}
+    </nav>
+  `;
+}
+
+route('/login', () => {
+  $('#app').innerHTML = `
+    <div class="login-wrap">
+      <div class="login-box">
+        <div class="logo">م</div>
+        <h2>الرقابة على الصرف الصناعي</h2>
+        <p>القانون 93 لسنة 1962</p>
+        <form onsubmit="event.preventDefault(); login(this.u.value, this.p.value)">
+          <div class="field"><label>اسم المستخدم</label><input name="u" value="admin"></div>
+          <div class="field"><label>كلمة المرور</label><input name="p" type="password" value="1234"></div>
+          <button class="btn btn-primary btn-block btn-lg">دخول</button>
+        </form>
+        <div class="demo-users">
+          <b>حسابات تجريبية (1234)</b>
+          <div>مدير: <code>admin</code></div>
+          <div>رقابة: <code>supervisor</code></div>
+          <div>كيميائي: <code>chemist</code></div>
+        </div>
+      </div>
+    </div>`;
+});
+
+route('/home', () => {
+  const u = Session.user;
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const samples = DB.get('samples',[]).filter(s=>!s.deleted);
+  const plans = DB.get('plan_items',[]);
+  
+  let stats = [
+    {num: plans.filter(p=>p.status==='scheduled').length, lbl:'مهام اليوم'},
+    {num: samples.filter(s=>s.status==='fail').length, lbl:'غير مطابقة', warn: true},
+    {num: samples.filter(s=>s.status==='pending').length, lbl:'قيد الانتظار'},
+    {num: facs.length, lbl:'المنشآت'}
+  ];
+
+  const content = `
+    <div class="page-title">لوحة التحكم</div>
+    <div class="stats">${stats.map(s=>`<div class="stat ${s.warn?'warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <a href="#/inspection/new" class="btn btn-primary btn-lg">+ معاينة</a>
+      <a href="#/license/new" class="btn btn-outline btn-lg">+ طلب توصيل</a>
+    </div>
+  `;
+  layout(content, 'الرئيسية');
+});
+
+route('/plans', () => {
+  const plans = DB.get('plan_items',[]);
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  
+  const grouped = plans.reduce((acc, p) => {
+    if(!acc[p.date]) acc[p.date] = [];
+    acc[p.date].push(p);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(grouped).sort();
+
+  const plansHTML = sortedDates.map(date => {
+    const items = grouped[date].map(p => {
+      const f = facs.find(x=>x.id===p.facility_id);
+      return `<div class="plan-item">
+        <div class="p-info"><div class="p-title">${esc(f?.name||'—')}</div></div>
+        <div><span class="badge badge-yellow">مجدول</span></div>
+      </div>`;
+    }).join('');
+    return `<div class="plan-day">
+      <div class="plan-day-header"><h4>📅 ${date === today() ? 'اليوم' : fmtDate(date)}</h4></div>
+      ${items}
+    </div>`;
+  }).join('') || '<div class="empty"><p>لا توجد بنود</p></div>';
+
+  layout(`<div class="page-title">خطة العمل</div>${plansHTML}`, 'الخطة');
+});
+
+route('/inspections', () => {
+  const insps = DB.get('inspections',[]).filter(i=>!i.deleted);
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+
+  const items = insps.map(i=>{
+    const f = facs.find(x=>x.id===i.facility_id);
+    return `<a class="item" href="#/inspection/${i.id}">
+      <div class="row"><div class="ttl">${esc(f?.name||'—')}</div><span class="badge badge-green">معتمد</span></div>
+      <div class="meta"><span>📅 ${fmtDate(i.inspection_date)}</span><span>🏢 ${esc(branchName(i.branch_id))}</span></div>
+    </a>`;
+  }).join('') || '<div class="empty"><p>لا توجد معاينات</p></div>';
+
+  layout(`<div class="page-title">المعاينات</div><a href="#/inspection/new" class="btn btn-primary btn-block btn-lg" style="margin-bottom:14px">+ معاينة جديدة</a>${items}`, 'المعاينات');
+});
+
+route('/inspection/new', () => renderInspectionForm());
+route('/inspection', (id) => renderInspectionForm(id));
+
+function renderInspectionForm(inspId){
+  const u = Session.user;
+  const existing = inspId ? DB.get('inspections',[]).find(i=>i.id===inspId) : null;
+  const fac = existing ? DB.get('facilities',[]).find(f=>f.id===existing.facility_id) : null;
+  const branches = DB.get('branches',[]).filter(b=>b.active);
+  const labs = DB.get('labs',[]).filter(l=>l.active);
+  const data = existing ? {...existing} : { reason:'plan', inspection_date: today(), branch_id: u.branch_id || branches[0].id, disposal_destination:'network' };
+  const f = fac || data;
+
+  const content = `
+    <div class="page-title">${existing?'تعديل معاينة':'معاينة جديدة'}</div>
+    <form id="inspForm" onsubmit="event.preventDefault(); saveInspection('${existing?.id||''}')">
+      
+      <div class="section-h">أ. بيانات المعاينة</div>
+      <div class="card">
+        <div class="field"><label>سبب المعاينة</label>
+          <select name="reason">
+            <option value="license" ${data.reason==='license'?'selected':''}>طلب توصيل</option>
+            <option value="plan" ${data.reason==='plan'?'selected':''}>خطة الإدارة</option>
+            <option value="survey" ${data.reason==='survey'?'selected':''}>مسح</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>تاريخ المعاينة</label><input type="date" name="inspection_date" value="${data.inspection_date}" required></div>
+          <div class="field"><label>الفرع</label>
+            <select name="branch_id">${branches.map(b=>`<option value="${b.id}" ${data.branch_id===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-h">ب. بيانات المنشأة</div>
+      <div class="card">
+        <div class="field"><label>اسم المنشأة <span class="req">*</span></label><input name="name" value="${esc(f.name||'')}" required></div>
+        <div class="field"><label>العنوان <span class="req">*</span></label><input name="address" value="${esc(f.address||'')}" required></div>
+        <div class="grid2">
+          <div class="field"><label>المالك</label><input name="owner" value="${esc(f.owner||'')}" required></div>
+          <div class="field"><label>التصنيف</label>
+            <select name="classification">
+              <option value="commercial" ${f.classification==='commercial'?'selected':''}>تجارية</option>
+              <option value="industrial" ${f.classification==='industrial'?'selected':''}>صناعية</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>متوسط الاستهلاك (م³)</label><input type="number" name="monthly_water_m3" value="${f.monthly_water_m3||''}" required></div>
+      </div>
+
+      <div class="section-h">ج. الصرف</div>
+      <div class="card">
+        <div class="field"><label>جهة التوصيل</label>
+          <select name="disposal_destination">
+            <option value="network" ${f.disposal_destination==='network'?'selected':''}>على الشبكة</option>
+            <option value="company_tanker" ${f.disposal_destination==='company_tanker'?'selected':''}>كسح تابع للشركة</option>
+            <option value="external_tanker" ${f.disposal_destination==='external_tanker'?'selected':''}>كسح خارجي (إلغاء)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-h">هـ. العينات</div>
+      <div class="card">
+        <button type="button" class="btn btn-outline btn-sm" onclick="addSample()" style="margin-bottom:10px">+ إضافة عينة</button>
+        <div id="samplesContainer"></div>
+      </div>
+
+      <div style="margin-top:16px;margin-bottom:20px">
+        <button type="submit" class="btn btn-primary btn-block btn-lg">اعتماد وحفظ</button>
+      </div>
+    </form>
+  `;
+  layout(content, 'المعاينات');
+  setTimeout(()=>{ if(existing) { const sl = DB.get('samples',[]).filter(s=>s.inspection_id===inspId && !s.deleted); sl.forEach(s=>addSample(s)); } }, 50);
+}
+
+function addSample(s){
+  const c = $('#samplesContainer');
+  const i = c.children.length;
+  const labs = DB.get('labs',[]).filter(l=>l.active);
+  const sdata = s || { code:'', type:'simple', outlet:'المخرج الرئيسي', lab_id: labs[0]?.id };
+  const html = `<div class="sample-card" data-sample="${i}">
+    <button type="button" class="rm" onclick="this.closest('[data-sample]').remove()">×</button>
+    <div class="sample-code">${esc(sdata.code || 'كود تلقائي')}</div>
+    <div class="field"><label>المخرج</label><input class="s-outlet" value="${esc(sdata.outlet)}"></div>
+    <div class="field"><label>المعمل</label>
+      <select class="s-lab">${labs.map(l=>`<option value="${l.id}" ${sdata.lab_id===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+    </div>
+  </div>`;
+  c.insertAdjacentHTML('beforeend', html);
+}
+
+function saveInspection(existingId){
+  const form = $('#inspForm');
+  const get = n => form.querySelector(`[name="${n}"]`)?.value || '';
+  const data = {
+    reason: get('reason'), inspection_date: get('inspection_date'), branch_id: get('branch_id'),
+    name: get('name').trim(), address: get('address').trim(), owner: get('owner').trim(),
+    classification: get('classification'), monthly_water_m3: parseFloat(get('monthly_water_m3')) || 0,
+    disposal_destination: get('disposal_destination'),
+    samples: [...form.querySelectorAll('[data-sample]')].map(s=>({
+      outlet: s.querySelector('.s-outlet').value.trim(), lab_id: s.querySelector('.s-lab').value
+    }))
+  };
+  const u = Session.user;
+
+  if(data.disposal_destination === 'external_tanker'){
+    const cancelled = DB.get('cancelled_inspections',[]);
+    cancelled.unshift({ id: uid(), ...data, cancelled_at: nowISO() });
+    DB.set('cancelled_inspections', cancelled);
+    toast('تم الحفظ في الملغاة','success'); location.hash='#/inspections'; return;
+  }
+
+  const facilities = DB.get('facilities',[]).filter(f=>!f.deleted);
+  let facilityId, facilityCode;
+  const dup = facilities.find(f => f.name===data.name && f.address===data.address);
+
+  if(dup){
+    facilityId = dup.id; facilityCode = dup.code;
+    const idx = facilities.findIndex(f=>f.id===dup.id);
+    facilities[idx] = {...facilities[idx], ...data};
+    DB.set('facilities', facilities);
+  } else {
+    const counters = DB.get('facility_code_counters', {});
+    const branch = DB.get('branches',[]).find(b=>b.id===data.branch_id);
+    counters[data.branch_id] = (counters[data.branch_id]||0) + 1;
+    DB.set('facility_code_counters', counters);
+    facilityCode = `${counters[data.branch_id]}/${branch.code}`;
+    facilityId = uid();
+    facilities.unshift({ id: facilityId, ...data, code: facilityCode, registered_at: nowISO(), deleted: false });
+    DB.set('facilities', facilities);
+  }
+
+  const samples = DB.get('samples',[]);
+  const branch = DB.get('branches',[]).find(b=>b.id===data.branch_id);
+  const yymmdd = new Date().toISOString().slice(2,10).replace(/-/g,'');
+  const approvalId = existingId || uid();
+  
+  data.samples.forEach(s => {
+    const rand = Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+    samples.unshift({ ...s, id: uid(), code: `${branch.code}-${yymmdd}-${rand}`, facility_id: facilityId, inspection_id: approvalId, collected_at: nowISO(), status:'pending', deleted: false });
+  });
+  DB.set('samples', samples);
+
+  const insps = DB.get('inspections', []);
+  if(existingId){
+    const idx = insps.findIndex(i=>i.id===existingId);
+    if(idx>=0) insps[idx] = {...insps[idx], ...data, facility_id:facilityId};
+  } else {
+    insps.unshift({ id: approvalId, ...data, facility_id:facilityId, inspector_id: u.id, status:'approved', inspection_date: data.inspection_date, deleted:false });
+  }
+  DB.set('inspections', insps);
+
+  toast(`تم الحفظ — كود: ${facilityCode}`,'success');
+  location.hash = '#/facility/' + facilityId;
+}
+
+route('/facilities', () => {
+  const facs = DB.get('facilities',[]).filter(f=>!f.deleted);
+  const items = facs.map(f=>`
+    <a class="item" href="#/facility/${f.id}">
+      <div class="row"><div class="ttl">${esc(f.name)}</div><span class="badge badge-blue">${esc(f.code)}</span></div>
+      <div class="meta"><span>👤 ${esc(f.owner)}</span><span>🏢 ${esc(branchName(f.branch_id))}</span></div>
+    </a>`).join('') || '<div class="empty"><p>لا توجد منشآت</p></div>';
+  layout(`<div class="page-title">المنشآت</div>${items}`, 'المنشآت');
+});
+
+route('/facility', (id) => {
+  const f = DB.get('facilities',[]).find(x=>x.id===id);
+  if(!f){ toast('غير موجودة','error'); return; }
+  const samples = DB.get('samples',[]).filter(s=>s.facility_id===id && !s.deleted);
+  const sampleItems = samples.map(s=>`
+    <a class="item" href="#/sample/${s.id}">
+      <div class="row"><div class="ttl mono">${esc(s.code)}</div><span class="badge badge-yellow">${sampleStatusLabel(s.status)}</span></div>
+    </a>`).join('') || '<div class="hint">لا توجد عينات</div>';
+
+  layout(`
+    <div class="page-title">${esc(f.name)} <span class="badge badge-blue">${esc(f.code)}</span></div>
+    <div class="card"><div>المالك: ${esc(f.owner)}</div></div>
+    <div class="section-h">العينات</div>${sampleItems}
+  `, 'المنشآت');
+});
+
+route('/sample', (id) => {
+  const s = DB.get('samples',[]).find(x=>x.id===id);
+  if(!s){ return; }
+  layout(`
+    <div class="page-title">العينة</div>
+    <div class="card"><div class="mono" style="font-size:16px;font-weight:800">${esc(s.code)}</div></div>
+  `, 'المنشآت');
+});
+
+route('/more', () => {
+  layout(`
+    <div class="page-title">المزيد</div>
+    <a class="item" href="#/licenses"><div class="ttl">📄 التراخيص</div></a>
+    <button class="btn btn-danger btn-block" style="margin-top:30px" onclick="if(confirm('مسح كل البيانات؟')) { localStorage.clear(); location.reload(); }">🗑️ تصفير البيانات</button>
+  `, 'المزيد');
+});
+
+route('/licenses', () => {
+  const licenses = DB.get('licenses',[]);
+  const items = licenses.map(l=>`
+    <a class="item" href="#/license/${l.id}">
+      <div class="row"><div class="ttl">${esc(l.facility_name)}</div><span class="badge badge-blue">${l.status}</span></div>
+    </a>`).join('');
+  layout(`<div class="page-title">التراخيص</div>${items}`, 'المزيد');
+});
+
+route('/license', (id) => {
+  const l = DB.get('licenses',[]).find(x=>x.id===id);
+  if(!l) return;
+  layout(`<div class="page-title">${esc(l.facility_name)}</div><div class="card">${esc(l.request_no)}</div>`, 'المزيد');
+});
+
+route('/license/new', () => {
+  layout(`
+    <div class="page-title">طلب توصيل</div>
+    <div class="card">
+      <form onsubmit="event.preventDefault(); saveNewLicense(this)">
+        <div class="field"><label>اسم المنشأة</label><input name="name" required></div>
+        <button class="btn btn-primary btn-block">حفظ</button>
+      </form>
+    </div>
+  `, 'المزيد');
+});
+
+function saveNewLicense(form){
+  const licenses = DB.get('licenses',[]);
+  licenses.unshift({ id:uid(), request_no:'LIC-'+Date.now(), facility_name: form.name.value, status:'new' });
+  DB.set('licenses', licenses);
+  toast('تم الحفظ','success');
+  location.hash = '#/licenses';
+}
+
+</script>
+</body>
+</html>
